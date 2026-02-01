@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, PlusCircle, Search, FileDown, RotateCcw, Layout, ClipboardList } from 'lucide-react';
+import { Package, PlusCircle, FileDown, ClipboardList } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 function App() {
@@ -8,7 +8,6 @@ function App() {
     name: '',
     surname: '',
     passport: '',
-    nationality: '',
     customsItems: []
   });
   const [item, setItem] = useState({ description: '', quantity: '', value: '' });
@@ -16,7 +15,7 @@ function App() {
   const addPassenger = () => {
     if (currentPassenger.name && currentPassenger.passport) {
       setPassengers([...passengers, { ...currentPassenger, id: Date.now() }]);
-      setCurrentPassenger({ name: '', surname: '', passport: '', nationality: '', customsItems: [] });
+      setCurrentPassenger({ name: '', surname: '', passport: '', customsItems: [] });
     }
   };
 
@@ -35,7 +34,6 @@ function App() {
       p.customsItems.map(i => ({
         'Ad Soyad': `${p.name} ${p.surname}`,
         'Pasaport': p.passport,
-        'Uyruk': p.nationality,
         'Eşya Tanımı': i.description,
         'Adet': i.quantity,
         'Değer': i.value
@@ -48,7 +46,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans">
       <div className="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-6">
         <div className="flex items-center gap-3 mb-8 border-b pb-4">
           <Package className="text-blue-600" size={32} />
@@ -70,6 +68,9 @@ function App() {
               <input type="number" placeholder="Adet" className="w-1/2 p-2 border rounded" value={item.quantity} onChange={e => setItem({...item, quantity: e.target.value})} />
               <button onClick={addItem} className="w-1/2 bg-green-600 text-white rounded hover:bg-green-700 transition">Eşyayı Ekle</button>
             </div>
+            <div className="text-sm text-gray-500">
+              Eklenen Eşyalar: {currentPassenger.customsItems.length}
+            </div>
           </div>
         </div>
 
@@ -84,23 +85,27 @@ function App() {
 
         <div className="mt-8">
           <h2 className="text-lg font-semibold mb-4">Kayıtlı Yolcular ({passengers.length})</h2>
-          <div className="border rounded-lg overflow-hidden">
+          <div className="border rounded-lg overflow-hidden overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-gray-100">
                 <tr>
-                  <th className="p-3">Yolcu</th>
-                  <th className="p-3">Pasaport</th>
-                  <th className="p-3">Eşya Sayısı</th>
+                  <th className="p-3 text-sm font-semibold">Yolcu</th>
+                  <th className="p-3 text-sm font-semibold">Pasaport</th>
+                  <th className="p-3 text-sm font-semibold">Durum</th>
                 </tr>
               </thead>
               <tbody>
-                {passengers.map(p => (
-                  <tr key={p.id} className="border-t">
-                    <td className="p-3">{p.name} {p.surname}</td>
-                    <td className="p-3">{p.passport}</td>
-                    <td className="p-3">{p.customsItems.length} parça</td>
-                  </tr>
-                ))}
+                {passengers.length === 0 ? (
+                  <tr><td colSpan="3" className="p-4 text-center text-gray-500">Henüz kayıt yok</td></tr>
+                ) : (
+                  passengers.map(p => (
+                    <tr key={p.id} className="border-t hover:bg-gray-50">
+                      <td className="p-3">{p.name} {p.surname}</td>
+                      <td className="p-3">{p.passport}</td>
+                      <td className="p-3 text-sm text-blue-600 font-medium">{p.customsItems.length} parça eşya</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
