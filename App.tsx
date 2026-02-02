@@ -604,6 +604,9 @@ export default function App() {
 
     if (tc) setTourCode(tc);
     if (ps && ps.length) setPassengers(ps);
+    // 🔥 İŞTE BU SATIRI EKLE:
+      setLoading(false); // Hafızada yolcu varsa ekran kilidini hemen aç!
+    }
     if (ts) localTsRef.current = ts;
     setListHidden(hid);
   }, []);
