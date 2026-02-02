@@ -745,8 +745,21 @@ export default function App() {
     [setListFromRawItems]
   );
 
-  const toggle = useCallback((id: number) => {
-  let updatedList: Passenger[] = [];
+ const toggle = useCallback((id: number) => {
+  setPassengers((prev) => {
+    // 1. Yeni listeyi oluştur (Tik atma işlemi)
+    const newList = prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p));
+
+    // 2. Telefona (Yerel hafızaya) hemen kaydet
+    localStorage.setItem(LS.passengers, JSON.stringify(newList));
+
+    // 3. Firebase'e gönder (İnternet yoksa bile arka planda denemeye devam eder)
+    // ÖNEMLİ: Başına 'await' koyma ki sistem donmasın!
+    fbSet(tourCode, newList);
+
+    return newList;
+  });
+}, [tourCode, setPassengers]);
 
   setPassengers((prev) => {
     // 1. Ekranı hemen güncelle (Senin orijinal mantığın)
