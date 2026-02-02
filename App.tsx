@@ -57,25 +57,33 @@ async function fbGet(path: string) {
 }
 
 async function fbSet(path: string, data: any) {
+  // 1. ADIM: İnternet yoksa Firebase'e hiç sorma, direkt hafızaya yaz ve bitir
+  if (!navigator.onLine) {
+    saveLocal(path, data);
+    console.log("Offline: Firebase atlandı, sadece yerel hafızaya yazıldı.");
+    return true; 
+  }
+
+  // 2. ADIM: İnternet varsa normal şekilde dene
   try {
     const r = await fetch(dbURL(path), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
+    
     if (r.ok) {
-      saveLocal(path, data); // Başarılı gönderimi hafızaya da işle
+      saveLocal(path, data); 
       return true;
     }
     throw new Error("Bağlantı Hatası");
   } catch (err) {
-    // İnternet yoksa bile hafızayı güncelle ki 'tik' işareti ekranda kalsın
+    // 3. ADIM: Bir hata olursa (örneğin tam o an internet koptuysa) yine hafızaya yaz
     saveLocal(path, data);
     console.warn("İnternet yok: İşlem yerel olarak kaydedildi.");
     return true; 
   }
 }
-
 function fbListen(path: string, cb: (d: any) => void) {
   let on = true, last = "";
   
