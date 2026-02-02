@@ -35,82 +35,52 @@ const getLocal = (key: string) => {
 };
 
 async function fbGet(path: string) {
-  // KRİTİK: Eğer internet yoksa HİÇ bekleme, direkt hafızayı oku
-  if (!navigator.onLine) {
-    console.log("Açılışta internet yok, hafızadan yükleniyor...");
-    return getLocal(path); 
-  }
-
   try {
-    // İnternet varsa sadece 3 saniye şans tanı (Uzun süre donmasın)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-    const r = await fetch(dbURL(path), { signal: controller.signal });
-    clearTimeout(timeoutId);
-
+    const r = await fetch(dbURL(path));
     if (r.ok) {
       const data = await r.json();
-      saveLocal(path, data);
+      saveLocal(path, data); // İnternet varsa veriyi yedekle
       return data;
     }
-    return getLocal(path);
+    throw new Error("Bağlantı Hatası");
   } catch (err) {
-    return getLocal(path);
+    // İnternet koptuğunda hafızadaki yedeği açar
+    console.log("Offline Mod: Hafızadaki veriler kullanılıyor.");
+    return getLocal(path); 
   }
 }
-async function fbSet(path: string, data: any) {
-  // 1. ADIM: İnternet yoksa Firebase'e hiç sorma, direkt hafızaya yaz ve bitir
-  if (!navigator.onLine) {
-    saveLocal(path, data);
-    console.log("Offline: Firebase atlandı, sadece yerel hafızaya yazıldı.");
-    return true; 
-  }
 
-  // 2. ADIM: İnternet varsa normal şekilde dene
+async function fbSet(path: string, data: any) {
   try {
     const r = await fetch(dbURL(path), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    
     if (r.ok) {
-      saveLocal(path, data); 
+      saveLocal(path, data); // Başarılı gönderimi hafızaya da işle
       return true;
     }
     throw new Error("Bağlantı Hatası");
   } catch (err) {
-    // 3. ADIM: Bir hata olursa (örneğin tam o an internet koptuysa) yine hafızaya yaz
+    // İnternet yoksa bile hafızayı güncelle ki 'tik' işareti ekranda kalsın
     saveLocal(path, data);
     console.warn("İnternet yok: İşlem yerel olarak kaydedildi.");
     return true; 
   }
 }
+
 function fbListen(path: string, cb: (d: any) => void) {
   let on = true, last = "";
-  
   const poll = async () => {
     if (!on) return;
-
-    // --- KONTROL MEKANİZMASI ---
-    // Eğer bekleyen (gönderilmeyi bekleyen) bir işlem varsa, Firebase'den veri ÇEKME.
-    // Çünkü çekersek, telefondaki o kaydedilmemiş tikler silinir.
-    const hasPending = Object.keys(localStorage).some(key => key.startsWith('mk_pending_'));
-
-    if (hasPending && navigator.onLine) {
-      // Bekleyen veri varsa listeyi güncelleme, 2 saniye sonra tekrar kontrol et
-      if (on) setTimeout(poll, 2000);
-      return;
-    }
-
     const d = await fbGet(path); 
     const s = JSON.stringify(d);
     if (s !== last && d !== null) {
       last = s;
       cb(d);
     }
-    if (on) setTimeout(poll, 3000);
+    if (on) setTimeout(poll, 3000); // 3 saniyede bir kontrol eder
   };
   poll();
   return () => { on = false; };
@@ -587,11 +557,9 @@ export default function App() {
       window.removeEventListener('offline', handleStatus);
     };
   }, []);
- export default function App() {
-  // 1. Durum Yönetimi (State)
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const LOGO = "https://www.markellatravel.com.tr/wp-content/uploads/2024/11/Ege-Markella-Logo-Yatay-1.png";
+
   const [passengers, setPassengers] = useState<Passenger[]>([]);
-  const [loading, setLoading] = useState(true); // Kilidi açan anahtar
   const [tourCode, setTourCode] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [pasteText, setPasteText] = useState("");
@@ -603,66 +571,30 @@ export default function App() {
   const [visaPassenger, setVisaPassenger] = useState<Passenger | null>(null);
   const [parseErr, setParseErr] = useState("");
   const [excelErr, setExcelErr] = useState("");
+  const [online, setOnline] = useState(true);
+
   const [listHidden, setListHidden] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
 
   const exitedRef = useRef<HTMLDivElement | null>(null);
+  const stopRef = useRef<null | (() => void)>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
   const localTsRef = useRef<number>(0);
 
-  // 2. İnternet Takibi
+  // Load from LocalStorage once
   useEffect(() => {
-    const handleStatus = () => setIsOnline(navigator.onLine);
-    window.addEventListener('online', handleStatus);
-    window.addEventListener('offline', handleStatus);
-    return () => {
-      window.removeEventListener('online', handleStatus);
-      window.removeEventListener('offline', handleStatus);
-    };
+    const tc = localStorage.getItem(LS.tourCode);
+    const ps = safeJsonParse<Passenger[]>(localStorage.getItem(LS.passengers), []);
+    const ts = Number(localStorage.getItem(LS.tourTs) || "0");
+    const hid = localStorage.getItem(LS.hidden) === "1";
+
+    if (tc) setTourCode(tc);
+    if (ps && ps.length) setPassengers(ps);
+    if (ts) localTsRef.current = ts;
+    setListHidden(hid);
   }, []);
 
-  // 3. İLK AÇILIŞ: Hafızadan verileri yükle ve kilidi aç
-  useEffect(() => {
-    const loadInitialData = () => {
-      const tc = localStorage.getItem(LS.tourCode);
-      const ps = safeJsonParse<Passenger[]>(localStorage.getItem(LS.passengers), []);
-      const ts = Number(localStorage.getItem(LS.tourTs) || "0");
-      const hid = localStorage.getItem(LS.hidden) === "1";
-
-      if (tc) setTourCode(tc);
-      if (ps && ps.length > 0) {
-        setPassengers(ps);
-      }
-      
-      if (ts) localTsRef.current = ts;
-      setListHidden(hid);
-
-      // 🔥 Burası kritik: İnternet olsa da olmasa da 1 saniye içinde tuşları aktif et
-      setTimeout(() => setLoading(false), 800);
-    };
-
-    loadInitialData();
-  }, []);
-
-  // 4. TIKLAMA FONKSİYONU (İnternetsiz de çalışır)
-  const toggle = useCallback((id: number) => {
-    setPassengers((prev) => {
-      // Önce listeyi güncelle
-      const newList = prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p));
-      
-      // Hemen telefona kaydet (Offline güvenlik)
-      localStorage.setItem(LS.passengers, JSON.stringify(newList));
-      
-      // Firebase'e arka planda gönder (Await yok, donma yapmaz)
-      fbSet(tourCode, newList); 
-      
-      return newList;
-    });
-  }, [tourCode]);
-
-  // LOGO ve diğer değişkenler
-  const LOGO = "https://www.markellatravel.com.tr/wp-content/uploads/2024/11/Ege-Markella-Logo-Yatay-1.png";
-
-  // ... (Buradan sonrası senin return kısmın)
   // Save hidden
   useEffect(() => {
     localStorage.setItem(LS.hidden, listHidden ? "1" : "0");
@@ -797,53 +729,8 @@ export default function App() {
     [setListFromRawItems]
   );
 
- const toggle = useCallback((id: number) => {
-  setPassengers((prev) => {
-    // 1. Yeni listeyi oluştur (Tik atma işlemi)
-    const newList = prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p));
-
-    // 2. Telefona (Yerel hafızaya) hemen kaydet
-    localStorage.setItem(LS.passengers, JSON.stringify(newList));
-
-    // 3. Firebase'e gönder (İnternet yoksa bile arka planda denemeye devam eder)
-    // ÖNEMLİ: Başına 'await' koyma ki sistem donmasın!
-    fbSet(tourCode, newList);
-
-    return newList;
-  });
-}, [tourCode, setPassengers]);
-
-  setPassengers((prev) => {
-    // 1. Ekranı hemen güncelle (Senin orijinal mantığın)
-    const newList = normalizePassengerList(
-      prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p))
-    );
-    // Güncellenmiş listeyi fonksiyon dışına taşıyoruz ki hafızaya atabilelim
-    updatedList = newList; 
-    return newList;
-  });
-
-  // --- BURASI HAYAT KURTARAN KISIM ---
-
-  // 2. Telefonun yerel hafızasına hemen kaydet (Offline açılış için)
-  localStorage.setItem("mk_turlar/aktifTur/passengers", JSON.stringify(updatedList));
-
-  // 3. Firebase'e gönder (Arka planda dener, internet gelince ulaşır)
-  fbSet("turlar/aktifTur/passengers", updatedList);
-
-}, [setPassengers, normalizePassengerList]); // Bağımlılıkları buraya ekledik
-
-      // 2. Yolcuyu ve sırasını bul
-      const indexInDb = newList.findIndex(p => p.id === id);
-      const updatedPassenger = newList[indexInDb];
-
-      // 3. Firebase'e sadece bu değişikliği bildir
-      if (updatedPassenger && indexInDb !== -1) {
-        fbSet(`turlar/aktifTur/passengers/${indexInDb}/checked`, updatedPassenger.checked);
-      }
-
-      return newList;
-    });
+  const toggle = useCallback((id: number) => {
+    setPassengers((prev) => normalizePassengerList(prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p))));
   }, []);
 
   const toggleVisa = useCallback((id: number, val: boolean) => {
