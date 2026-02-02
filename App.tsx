@@ -35,17 +35,23 @@ const getLocal = (key: string) => {
 };
 
 async function fbGet(path: string) {
+  // 1. ADIM: İnternet yoksa Firebase'i hiç bekleme
+  if (!navigator.onLine) {
+    console.log("İnternet yok, direkt hafızadan okunuyor...");
+    return getLocal(path); // Hafızadaki son yedekle kapıyı aç
+  }
+
+  // 2. ADIM: İnternet varsa normal şekilde dene
   try {
     const r = await fetch(dbURL(path));
     if (r.ok) {
       const data = await r.json();
-      saveLocal(path, data); // İnternet varsa veriyi yedekle
+      saveLocal(path, data); // İnternet varken gelen veriyi hafızaya yedekle
       return data;
     }
     throw new Error("Bağlantı Hatası");
   } catch (err) {
-    // İnternet koptuğunda hafızadaki yedeği açar
-    console.log("Offline Mod: Hafızadaki veriler kullanılıyor.");
+    // 3. ADIM: Bir hata olursa yine hafızaya başvur
     return getLocal(path); 
   }
 }
