@@ -35,27 +35,30 @@ const getLocal = (key: string) => {
 };
 
 async function fbGet(path: string) {
-  // 1. ADIM: İnternet yoksa Firebase'i hiç bekleme
+  // KRİTİK: Eğer internet yoksa HİÇ bekleme, direkt hafızayı oku
   if (!navigator.onLine) {
-    console.log("İnternet yok, direkt hafızadan okunuyor...");
-    return getLocal(path); // Hafızadaki son yedekle kapıyı aç
-  }
-
-  // 2. ADIM: İnternet varsa normal şekilde dene
-  try {
-    const r = await fetch(dbURL(path));
-    if (r.ok) {
-      const data = await r.json();
-      saveLocal(path, data); // İnternet varken gelen veriyi hafızaya yedekle
-      return data;
-    }
-    throw new Error("Bağlantı Hatası");
-  } catch (err) {
-    // 3. ADIM: Bir hata olursa yine hafızaya başvur
+    console.log("Açılışta internet yok, hafızadan yükleniyor...");
     return getLocal(path); 
   }
-}
 
+  try {
+    // İnternet varsa sadece 3 saniye şans tanı (Uzun süre donmasın)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+    const r = await fetch(dbURL(path), { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (r.ok) {
+      const data = await r.json();
+      saveLocal(path, data);
+      return data;
+    }
+    return getLocal(path);
+  } catch (err) {
+    return getLocal(path);
+  }
+}
 async function fbSet(path: string, data: any) {
   // 1. ADIM: İnternet yoksa Firebase'e hiç sorma, direkt hafızaya yaz ve bitir
   if (!navigator.onLine) {
