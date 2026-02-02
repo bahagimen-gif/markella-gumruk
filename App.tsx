@@ -743,11 +743,27 @@ export default function App() {
   );
 
   const toggle = useCallback((id: number) => {
-    setPassengers((prev) => {
-      // 1. Ekranı hemen güncelle
-      const newList = normalizePassengerList(
-        prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p))
-      );
+  let updatedList: Passenger[] = [];
+
+  setPassengers((prev) => {
+    // 1. Ekranı hemen güncelle (Senin orijinal mantığın)
+    const newList = normalizePassengerList(
+      prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p))
+    );
+    // Güncellenmiş listeyi fonksiyon dışına taşıyoruz ki hafızaya atabilelim
+    updatedList = newList; 
+    return newList;
+  });
+
+  // --- BURASI HAYAT KURTARAN KISIM ---
+
+  // 2. Telefonun yerel hafızasına hemen kaydet (Offline açılış için)
+  localStorage.setItem("mk_turlar/aktifTur/passengers", JSON.stringify(updatedList));
+
+  // 3. Firebase'e gönder (Arka planda dener, internet gelince ulaşır)
+  fbSet("turlar/aktifTur/passengers", updatedList);
+
+}, [setPassengers, normalizePassengerList]); // Bağımlılıkları buraya ekledik
 
       // 2. Yolcuyu ve sırasını bul
       const indexInDb = newList.findIndex(p => p.id === id);
