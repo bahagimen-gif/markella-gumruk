@@ -17,39 +17,23 @@ type TourPayload = {
 };
 
 // =========================
-// FIREBASE (REST) CONFIG + OFFLINE SUPPORT
+// FIREBASE (REST) CONFIG
 // =========================
+// ✅ Senin databaseURL'in eklendi
 const FB = {
   databaseURL: "https://markella-rezervasyon-default-rtdb.europe-west1.firebasedatabase.app",
 };
 
 const dbURL = (path: string) => `${FB.databaseURL}/${path}.json`;
 
-// Yardımcı: Veriyi telefonun hafızasına (localStorage) yedekler
-const saveLocal = (key: string, data: any) => localStorage.setItem("mk_" + key, JSON.stringify(data));
-
-// Yardımcı: Veriyi telefonun hafızasından geri getirir
-const getLocal = (key: string) => {
-  const d = localStorage.getItem("mk_" + key);
-  return d ? JSON.parse(d) : null;
-};
-
 async function fbGet(path: string) {
   try {
     const r = await fetch(dbURL(path));
-    if (r.ok) {
-      const data = await r.json();
-      saveLocal(path, data); // İnternet varsa veriyi yedekle
-      return data;
-    }
-    throw new Error("Bağlantı Hatası");
-  } catch (err) {
-    // İnternet koptuğunda hafızadaki yedeği açar
-    console.log("Offline Mod: Hafızadaki veriler kullanılıyor.");
-    return getLocal(path); 
+    return r.ok ? await r.json() : null;
+  } catch {
+    return null;
   }
 }
-
 async function fbSet(path: string, data: any) {
   try {
     const r = await fetch(dbURL(path), {
@@ -57,33 +41,28 @@ async function fbSet(path: string, data: any) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    if (r.ok) {
-      saveLocal(path, data); // Başarılı gönderimi hafızaya da işle
-      return true;
-    }
-    throw new Error("Bağlantı Hatası");
-  } catch (err) {
-    // İnternet yoksa bile hafızayı güncelle ki 'tik' işareti ekranda kalsın
-    saveLocal(path, data);
-    console.warn("İnternet yok: İşlem yerel olarak kaydedildi.");
-    return true; 
+    return r.ok;
+  } catch {
+    return false;
   }
 }
-
 function fbListen(path: string, cb: (d: any) => void) {
-  let on = true, last = "";
+  let on = true,
+    last = "";
   const poll = async () => {
     if (!on) return;
-    const d = await fbGet(path); 
+    const d = await fbGet(path);
     const s = JSON.stringify(d);
-    if (s !== last && d !== null) {
+    if (s !== last) {
       last = s;
       cb(d);
     }
-    if (on) setTimeout(poll, 3000); // 3 saniyede bir kontrol eder
+    if (on) setTimeout(poll, 2500);
   };
   poll();
-  return () => { on = false; };
+  return () => {
+    on = false;
+  };
 }
 
 // =========================
@@ -545,18 +524,6 @@ function InsideModal({
 // MAIN
 // =========================
 export default function App() {
-  // İnternet var mı yok mu takibi
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-
-  useEffect(() => {
-    const handleStatus = () => setIsOnline(navigator.onLine);
-    window.addEventListener('online', handleStatus);
-    window.addEventListener('offline', handleStatus);
-    return () => {
-      window.removeEventListener('online', handleStatus);
-      window.removeEventListener('offline', handleStatus);
-    };
-  }, []);
   const LOGO = "https://www.markellatravel.com.tr/wp-content/uploads/2024/11/Ege-Markella-Logo-Yatay-1.png";
 
   const [passengers, setPassengers] = useState<Passenger[]>([]);
@@ -819,21 +786,6 @@ export default function App() {
   // ---- MAIN ----
   return (
     <div style={S.app} onClick={() => setShowMenu(false)}>
-      {/* İNTERNET DURUM UYARISI */}
-      {!isOnline && (
-        <div style={{ 
-          backgroundColor: '#d32f2f', 
-          color: 'white', 
-          textAlign: 'center', 
-          padding: '10px', 
-          marginBottom: '10px',
-          borderRadius: '8px',
-          fontWeight: 'bold',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-        }}>
-          ⚠️ ŞU AN ÇEVRİMDIŞISINIZ. Kayıtlar internet gelince eşitlenecek.
-        </div>
-      )}
       <div style={S.deco1} />
       <div style={S.deco2} />
 
