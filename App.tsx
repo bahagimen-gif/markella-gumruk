@@ -730,7 +730,23 @@ export default function App() {
   );
 
   const toggle = useCallback((id: number) => {
-    setPassengers((prev) => normalizePassengerList(prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p))));
+    setPassengers((prev) => {
+      // 1. Ekranı hemen güncelle
+      const newList = normalizePassengerList(
+        prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p))
+      );
+
+      // 2. Yolcuyu ve sırasını bul
+      const indexInDb = newList.findIndex(p => p.id === id);
+      const updatedPassenger = newList[indexInDb];
+
+      // 3. Firebase'e sadece bu değişikliği bildir
+      if (updatedPassenger && indexInDb !== -1) {
+        fbSet(`turlar/aktifTur/passengers/${indexInDb}/checked`, updatedPassenger.checked);
+      }
+
+      return newList;
+    });
   }, []);
 
   const toggleVisa = useCallback((id: number, val: boolean) => {
