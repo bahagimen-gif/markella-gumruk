@@ -587,9 +587,11 @@ export default function App() {
       window.removeEventListener('offline', handleStatus);
     };
   }, []);
-  const LOGO = "https://www.markellatravel.com.tr/wp-content/uploads/2024/11/Ege-Markella-Logo-Yatay-1.png";
-
+ export default function App() {
+  // 1. Durum Yönetimi (State)
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [passengers, setPassengers] = useState<Passenger[]>([]);
+  const [loading, setLoading] = useState(true); // Kilidi açan anahtar
   const [tourCode, setTourCode] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [pasteText, setPasteText] = useState("");
@@ -601,33 +603,66 @@ export default function App() {
   const [visaPassenger, setVisaPassenger] = useState<Passenger | null>(null);
   const [parseErr, setParseErr] = useState("");
   const [excelErr, setExcelErr] = useState("");
-  const [online, setOnline] = useState(true);
-
   const [listHidden, setListHidden] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
 
   const exitedRef = useRef<HTMLDivElement | null>(null);
-  const stopRef = useRef<null | (() => void)>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
-
   const localTsRef = useRef<number>(0);
 
-  // Load from LocalStorage once
+  // 2. İnternet Takibi
   useEffect(() => {
-    const tc = localStorage.getItem(LS.tourCode);
-    const ps = safeJsonParse<Passenger[]>(localStorage.getItem(LS.passengers), []);
-    const ts = Number(localStorage.getItem(LS.tourTs) || "0");
-    const hid = localStorage.getItem(LS.hidden) === "1";
-
-    if (tc) setTourCode(tc);
-    if (ps && ps.length) setPassengers(ps);
-    // 🔥 İŞTE BU SATIRI EKLE:
-      setLoading(false); // Hafızada yolcu varsa ekran kilidini hemen aç!
-    }
-    if (ts) localTsRef.current = ts;
-    setListHidden(hid);
+    const handleStatus = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', handleStatus);
+    window.addEventListener('offline', handleStatus);
+    return () => {
+      window.removeEventListener('online', handleStatus);
+      window.removeEventListener('offline', handleStatus);
+    };
   }, []);
 
+  // 3. İLK AÇILIŞ: Hafızadan verileri yükle ve kilidi aç
+  useEffect(() => {
+    const loadInitialData = () => {
+      const tc = localStorage.getItem(LS.tourCode);
+      const ps = safeJsonParse<Passenger[]>(localStorage.getItem(LS.passengers), []);
+      const ts = Number(localStorage.getItem(LS.tourTs) || "0");
+      const hid = localStorage.getItem(LS.hidden) === "1";
+
+      if (tc) setTourCode(tc);
+      if (ps && ps.length > 0) {
+        setPassengers(ps);
+      }
+      
+      if (ts) localTsRef.current = ts;
+      setListHidden(hid);
+
+      // 🔥 Burası kritik: İnternet olsa da olmasa da 1 saniye içinde tuşları aktif et
+      setTimeout(() => setLoading(false), 800);
+    };
+
+    loadInitialData();
+  }, []);
+
+  // 4. TIKLAMA FONKSİYONU (İnternetsiz de çalışır)
+  const toggle = useCallback((id: number) => {
+    setPassengers((prev) => {
+      // Önce listeyi güncelle
+      const newList = prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p));
+      
+      // Hemen telefona kaydet (Offline güvenlik)
+      localStorage.setItem(LS.passengers, JSON.stringify(newList));
+      
+      // Firebase'e arka planda gönder (Await yok, donma yapmaz)
+      fbSet(tourCode, newList); 
+      
+      return newList;
+    });
+  }, [tourCode]);
+
+  // LOGO ve diğer değişkenler
+  const LOGO = "https://www.markellatravel.com.tr/wp-content/uploads/2024/11/Ege-Markella-Logo-Yatay-1.png";
+
+  // ... (Buradan sonrası senin return kısmın)
   // Save hidden
   useEffect(() => {
     localStorage.setItem(LS.hidden, listHidden ? "1" : "0");
