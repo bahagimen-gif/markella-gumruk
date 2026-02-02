@@ -72,15 +72,28 @@ async function fbSet(path: string, data: any) {
 
 function fbListen(path: string, cb: (d: any) => void) {
   let on = true, last = "";
+  
   const poll = async () => {
     if (!on) return;
+
+    // --- KONTROL MEKANİZMASI ---
+    // Eğer bekleyen (gönderilmeyi bekleyen) bir işlem varsa, Firebase'den veri ÇEKME.
+    // Çünkü çekersek, telefondaki o kaydedilmemiş tikler silinir.
+    const hasPending = Object.keys(localStorage).some(key => key.startsWith('mk_pending_'));
+
+    if (hasPending && navigator.onLine) {
+      // Bekleyen veri varsa listeyi güncelleme, 2 saniye sonra tekrar kontrol et
+      if (on) setTimeout(poll, 2000);
+      return;
+    }
+
     const d = await fbGet(path); 
     const s = JSON.stringify(d);
     if (s !== last && d !== null) {
       last = s;
       cb(d);
     }
-    if (on) setTimeout(poll, 3000); // 3 saniyede bir kontrol eder
+    if (on) setTimeout(poll, 3000);
   };
   poll();
   return () => { on = false; };
