@@ -93,7 +93,6 @@ function parseText(text: string) {
     if (rem.length > 1) out.push({ name: rem, passport, phone });
   });
 
-  // Aynı isimleri silmiyoruz (sonradan numaralandırılıyor)
   return out;
 }
 
@@ -548,6 +547,7 @@ export default function App() {
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const localTsRef = useRef<number>(0);
+  const lastPushRef = useRef<string>(""); // ✅ YENİ - gereksiz push engelleme
 
   // Load from LocalStorage once
   useEffect(() => {
@@ -580,9 +580,14 @@ export default function App() {
     localStorage.setItem(LS.tourCode, tourCode);
   }, [tourCode]);
 
-  // Firebase push
+  // ✅ İYİLEŞTİRME 1: Firebase push - gereksiz push engelleme
   useEffect(() => {
     if (!tourCode) return;
+
+    // Değişiklik yoksa push etme (batarya + traffic tasarrufu)
+    const curr = JSON.stringify(passengers);
+    if (curr === lastPushRef.current) return;
+    lastPushRef.current = curr;
 
     const ts = Date.now();
     localTsRef.current = ts;
@@ -598,10 +603,12 @@ export default function App() {
       if (!remote || !remote.passengers) return;
       if (typeof remote.ts !== "number") return;
 
+      // Remote daha yeniyse local'i güncelle (timestamp-based conflict resolution)
       if (remote.ts >= (localTsRef.current || 0)) {
         setOnline(true);
         localTsRef.current = remote.ts;
         setPassengers(remote.passengers);
+        lastPushRef.current = JSON.stringify(remote.passengers); // ✅ YENİ - sonsuz loop engelleme
       }
     });
     stopRef.current = stop;
@@ -610,15 +617,15 @@ export default function App() {
     };
   }, [tourCode]);
 
-  // Offline retry
+  // ✅ İYİLEŞTİRME 2: Offline retry - 10 saniyede bir (önceden 4sn)
   useEffect(() => {
     if (!tourCode) return;
     const t = setInterval(async () => {
-      if (online) return;
+      if (online) return; // Online'sa retry'a gerek yok
       const payload: TourPayload = { passengers, ts: localTsRef.current || Date.now() };
       const ok = await fbSet(`tours/${tourCode}`, payload);
       if (ok) setOnline(true);
-    }, 4000);
+    }, 10000); // 4sn → 10sn (batarya dostu)
     return () => clearInterval(t);
   }, [online, tourCode, passengers]);
 
@@ -630,6 +637,7 @@ export default function App() {
     setShowMenu(false);
 
     localTsRef.current = Date.now();
+    lastPushRef.current = "[]"; // ✅ Reset
     localStorage.setItem(LS.tourCode, code);
     localStorage.setItem(LS.passengers, JSON.stringify([]));
     localStorage.setItem(LS.tourTs, String(localTsRef.current));
@@ -642,6 +650,7 @@ export default function App() {
 
     const ts = typeof data.ts === "number" ? data.ts : Date.now();
     localTsRef.current = ts;
+    lastPushRef.current = JSON.stringify(data.passengers || []); // ✅ Reset
     localStorage.setItem(LS.tourCode, code);
     localStorage.setItem(LS.passengers, JSON.stringify(data.passengers || []));
     localStorage.setItem(LS.tourTs, String(ts));
@@ -769,7 +778,11 @@ export default function App() {
                 const ps = localStorage.getItem(LS.passengers);
                 const ts = localStorage.getItem(LS.tourTs);
                 if (tc) setTourCode(tc);
-                if (ps) setPassengers(JSON.parse(ps));
+                if (ps) {
+                  const parsed = JSON.parse(ps);
+                  setPassengers(parsed);
+                  lastPushRef.current = JSON.stringify(parsed); // ✅ Reset
+                }
                 if (ts) localTsRef.current = Number(ts);
               }}
             >
@@ -945,7 +958,7 @@ export default function App() {
             <div style={{ fontSize: "34px", marginBottom: "10px" }}>🙈</div>
             <div style={{ fontSize: "14px", lineHeight: 1.6, color: "rgba(255,255,255,0.75)", fontWeight: 700 }}>Liste gizlendi</div>
             <div style={{ fontSize: "12px", marginTop: "6px", color: "rgba(255,255,255,0.4)" }}>
-              Menüden <b>“Listeyi Göster”</b> diyerek geri açabilirsin.
+              Menüden <b>"Listeyi Göster"</b> diyerek geri açabilirsin.
             </div>
           </div>
         ) : (
@@ -1234,7 +1247,6 @@ const S: any = {
   statNum: { fontSize: "20px", fontWeight: 700, color: "#fff" },
   statLbl: { fontSize: "11px", color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "2px" },
 
-  // header altına boşluk
   bodyWithStickyHeader: { padding: "24px 16px 120px", position: "relative", zIndex: 1, maxWidth: "540px", margin: "0 auto" },
 
   searchWrap: { position: "relative", marginBottom: "14px" },
