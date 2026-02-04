@@ -538,6 +538,22 @@ export default function App() {
   const [parseErr, setParseErr] = useState("");
   const [excelErr, setExcelErr] = useState("");
   const [online, setOnline] = useState(true);
+  // Online/offline durumu dinle
+useEffect(() => {
+  const handleOnline = () => setOnline(true);
+  const handleOffline = () => setOnline(false);
+  
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
+  
+  // İlk durumu kontrol et
+  setOnline(navigator.onLine);
+  
+  return () => {
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('offline', handleOffline);
+  };
+}, []);
 
   const [listHidden, setListHidden] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -596,10 +612,14 @@ export default function App() {
     fbSet(`tours/${tourCode}`, payload).then((ok) => setOnline(ok));
   }, [passengers, tourCode]);
 
-  // Firebase listen
-  useEffect(() => {
-    if (!tourCode) return;
-    const stop = fbListen(`tours/${tourCode}`, (remote: TourPayload | null) => {
+ // Firebase listen - sadece online'da çalışsın
+useEffect(() => {
+  if (!tourCode) return;
+  
+  // Online değilken listen'a gerek yok (offline mode)
+  if (!navigator.onLine) return;
+  
+  const stop = fbListen(`tours/${tourCode}`, (remote: TourPayload | null) => {
       if (!remote || !remote.passengers) return;
       if (typeof remote.ts !== "number") return;
 
@@ -706,15 +726,18 @@ export default function App() {
   );
 
   const toggle = useCallback((id: number) => {
-    setPassengers((prev) => normalizePassengerList(prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p))));
-  }, []);
+  localTsRef.current = Date.now(); // ✅ Timestamp güncelle
+  setPassengers((prev) => normalizePassengerList(prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p))));
+}, []);
 
   const toggleVisa = useCallback((id: number, val: boolean) => {
-    setPassengers((prev) => normalizePassengerList(prev.map((p) => (p.id === id ? { ...p, visaFlag: val } : p))));
-  }, []);
+  localTsRef.current = Date.now(); // ✅ Timestamp güncelle
+  setPassengers((prev) => normalizePassengerList(prev.map((p) => (p.id === id ? { ...p, visaFlag: val } : p))));
+}, []);
 
   const addPassenger = useCallback((x: { name: string; passport: string; phone: string }) => {
-    setPassengers((prev) => {
+  localTsRef.current = Date.now(); // ✅ Timestamp güncelle
+  setPassengers((prev) => {
       const now = Date.now() + Math.random();
       const added: Passenger = {
         id: now,
