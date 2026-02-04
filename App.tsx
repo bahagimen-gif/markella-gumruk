@@ -676,17 +676,23 @@ useEffect(() => {
     };
   }, [tourCode]);
 
-  // ✅ İYİLEŞTİRME 2: Offline retry - 10 saniyede bir (önceden 4sn)
-  useEffect(() => {
-    if (!tourCode) return;
-    const t = setInterval(async () => {
-      if (online) return; // Online'sa retry'a gerek yok
+ // ✅ İYİLEŞTİRME 2: Offline retry - 10 saniyede bir (önceden 4sn)
+useEffect(() => {
+  if (!tourCode) return;
+  const t = setInterval(async () => {
+    // Online'sa retry'a gerek yok
+    if (online || !navigator.onLine) return;
+    
+    try {
       const payload: TourPayload = { passengers, ts: localTsRef.current || Date.now() };
       const ok = await fbSet(`tours/${tourCode}`, payload);
       if (ok) setOnline(true);
-    }, 10000); // 4sn → 10sn (batarya dostu)
-    return () => clearInterval(t);
-  }, [online, tourCode, passengers]);
+    } catch {
+      // Sessizce devam et
+    }
+  }, 10000);
+  return () => clearInterval(t);
+}, [online, tourCode, passengers]);
 
   const createTour = useCallback(() => {
     const code = genCode();
