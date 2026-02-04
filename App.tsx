@@ -26,22 +26,39 @@ const FB = {
 
 const dbURL = (path: string) => `${FB.databaseURL}/${path}.json`;
 
+// Timeout wrapper - fetch'i zorla durdur
+function fetchWithTimeout(url: string, options: any = {}, timeout = 5000) {
+  return Promise.race([
+    fetch(url, options),
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('timeout')), timeout)
+    )
+  ]);
+}
+
 async function fbGet(path: string) {
   try {
-    const r = await fetch(dbURL(path));
-    return r.ok ? await r.json() : null;
+    // Offline'sa hiç deneme
+    if (!navigator.onLine) return null;
+    
+    const r = await fetchWithTimeout(dbURL(path), {}, 5000);
+    return (r as Response).ok ? await (r as Response).json() : null;
   } catch {
     return null;
   }
 }
+
 async function fbSet(path: string, data: any) {
   try {
-    const r = await fetch(dbURL(path), {
+    // Offline'sa hiç deneme
+    if (!navigator.onLine) return false;
+    
+    const r = await fetchWithTimeout(dbURL(path), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
-    });
-    return r.ok;
+    }, 5000);
+    return (r as Response).ok;
   } catch {
     return false;
   }
