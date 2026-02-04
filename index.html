@@ -2,20 +2,28 @@
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Markella Gümrük</title>
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1a2744" />
+    <meta name="description" content="Gümrük Çıkış Check-In Kontrolü - Markella Travel" />
+    
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    
+    <title>Gümrük Check-In | Markella Travel</title>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/main.jsx"></script>
-
+    <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Service Worker -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('SW registered'))
+            .catch(err => console.log('SW error:', err));
         });
       }
     </script>
