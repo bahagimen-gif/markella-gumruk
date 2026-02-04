@@ -7,6 +7,7 @@ type Passenger = {
   phone: string;
   checked: boolean;
   visaFlag: boolean;
+  listOwner: string; // ✅ YENİ - hangi listeye ait (Markella, Atlas, vb)
   dupOf?: string;
   dupIndex?: number;
 };
@@ -19,38 +20,57 @@ type TourPayload = {
 // =========================
 // FIREBASE (REST) CONFIG
 // =========================
-// ✅ Senin databaseURL'in eklendi
 const FB = {
   databaseURL: "https://markella-rezervasyon-default-rtdb.europe-west1.firebasedatabase.app",
 };
 
 const dbURL = (path: string) => `${FB.databaseURL}/${path}.json`;
 
+// ✅ Timeout wrapper - donmayı engeller
+function fetchWithTimeout(url: string, options: any = {}, timeout = 5000): Promise<Response> {
+  return Promise.race([
+    fetch(url, options),
+    new Promise<Response>((_, reject) => setTimeout(() => reject(new Error("timeout")), timeout)),
+  ]) as Promise<Response>;
+}
+
 async function fbGet(path: string) {
   try {
-    const r = await fetch(dbURL(path));
+    if (!navigator.onLine) return null;
+    const r = await fetchWithTimeout(dbURL(path), {}, 5000);
     return r.ok ? await r.json() : null;
   } catch {
     return null;
   }
 }
+
 async function fbSet(path: string, data: any) {
   try {
-    const r = await fetch(dbURL(path), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
+    if (!navigator.onLine) return false;
+    const r = await fetchWithTimeout(
+      dbURL(path),
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      },
+      5000
+    );
     return r.ok;
   } catch {
     return false;
   }
 }
+
 function fbListen(path: string, cb: (d: any) => void) {
   let on = true,
     last = "";
   const poll = async () => {
     if (!on) return;
+    if (!navigator.onLine) {
+      setTimeout(poll, 2500);
+      return;
+    }
     const d = await fbGet(path);
     const s = JSON.stringify(d);
     if (s !== last) {
@@ -69,14 +89,9 @@ function fbListen(path: string, cb: (d: any) => void) {
 // PARSE (paste)
 // =========================
 function parseText(text: string) {
-  const lines = text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   const phoneRe = /(\+?\d[\d\s\-().]{5,}\d)/;
   const ppRe = /\b([A-Za-z]{0,3}\d{6,9}[A-Za-z0-9]{0,2})\b/;
-
   const out: { name: string; passport: string; phone: string }[] = [];
 
   lines.forEach((line) => {
@@ -85,11 +100,7 @@ function parseText(text: string) {
     let rem = line.replace(pm ? pm[0] : "", "");
     const ppm = rem.match(ppRe);
     const passport = ppm ? ppm[1].trim() : "";
-    rem = rem
-      .replace(ppm ? ppm[0] : "", "")
-      .replace(/[-:;,|/]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
+    rem = rem.replace(ppm ? ppm[0] : "", "").replace(/[-:;,|/]/g, "").replace(/\s+/g, " ").trim();
     if (rem.length > 1) out.push({ name: rem, passport, phone });
   });
 
@@ -136,14 +147,13 @@ function normalizePassengerList(list: Passenger[]) {
 }
 
 // =========================
-// WhatsApp open helper (app first)
+// WhatsApp
 // =========================
 function openWhatsApp(phoneRaw: string) {
   const cl = (phoneRaw || "").replace(/[\s\-().]/g, "");
   const wa = cl.startsWith("+") ? cl : "+90" + cl.replace(/^0/, "");
   const appUrl = `whatsapp://send?phone=${wa}`;
   const webUrl = `https://api.whatsapp.com/send?phone=${wa}`;
-
   window.location.href = appUrl;
   setTimeout(() => {
     try {
@@ -155,7 +165,7 @@ function openWhatsApp(phoneRaw: string) {
 }
 
 // =========================
-// XLSX via CDN (no npm)
+// XLSX via CDN
 // =========================
 declare global {
   interface Window {
@@ -174,11 +184,7 @@ function loadXLSX(): Promise<void> {
 }
 
 function normalizeHeader(h: any) {
-  return String(h || "")
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/[_\-]/g, "")
-    .replace(/[ıİ]/g, "i");
+  return String(h || "").toLowerCase().replace(/\s+/g, "").replace(/[_\-]/g, "").replace(/[ıİ]/g, "i");
 }
 function pickHeaderKey(headers: string[], candidates: string[]) {
   const normMap = new Map(headers.map((h) => [normalizeHeader(h), h]));
@@ -211,7 +217,6 @@ async function parseExcelFile(file: File) {
   const wb = window.XLSX.read(buf, { type: "array" });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows: any[] = window.XLSX.utils.sheet_to_json(ws, { defval: "" });
-
   if (!rows || !rows.length) return { items: [], error: "Excel boş görünüyor." };
 
   const headers = Object.keys(rows[0] || {});
@@ -219,7 +224,7 @@ async function parseExcelFile(file: File) {
   const passKey = pickHeaderKey(headers, ["pasaport", "pasaport no", "pasaport numarasi", "passport", "passportno"]);
   const gsmKey = pickHeaderKey(headers, ["gsm", "telefon", "cep", "mobile", "mobil", "phone"]);
 
-  if (!nameKey) return { items: [], error: "Excel içinde 'Ad Soyad' sütunu bulunamadı. (Örn: AD SOYAD)" };
+  if (!nameKey) return { items: [], error: "Excel içinde 'Ad Soyad' sütunu bulunamadı." };
 
   const out = rows
     .map((r) => {
@@ -237,10 +242,11 @@ async function parseExcelFile(file: File) {
 // LocalStorage
 // =========================
 const LS = {
-  tourCode: "mk_tourCode_v1",
-  passengers: "mk_passengers_v1",
-  tourTs: "mk_tourTs_v1",
-  hidden: "mk_listHidden_v1",
+  tourCode: "mk_tourCode_v2",
+  passengers: "mk_passengers_v2",
+  tourTs: "mk_tourTs_v2",
+  hidden: "mk_listHidden_v2",
+  lists: "mk_customLists_v2", // ✅ YENİ - özel liste isimleri
 };
 
 function safeJsonParse<T>(s: string | null, fallback: T): T {
@@ -331,15 +337,7 @@ function JoinSheet({ onJoin, onClose }: { onJoin: (code: string, data: any) => v
   );
 }
 
-function VisaSheet({
-  passenger,
-  onToggle,
-  onClose,
-}: {
-  passenger: Passenger;
-  onToggle: (id: number, val: boolean) => void;
-  onClose: () => void;
-}) {
+function VisaSheet({ passenger, onToggle, onClose }: { passenger: Passenger; onToggle: (id: number, val: boolean) => void; onClose: () => void }) {
   const hasVisa = passenger.visaFlag;
   return (
     <div style={S.overlay} onClick={onClose}>
@@ -377,16 +375,20 @@ function VisaSheet({
   );
 }
 
+// ✅ YENİ - Liste seçimi ile yolcu ekleme
 function AddPassengerSheet({
   onAdd,
   onClose,
+  availableLists,
 }: {
-  onAdd: (x: { name: string; passport: string; phone: string }) => void;
+  onAdd: (x: { name: string; passport: string; phone: string; listOwner: string }) => void;
   onClose: () => void;
+  availableLists: string[];
 }) {
   const [name, setName] = useState("");
   const [passport, setPassport] = useState("");
   const [phone, setPhone] = useState("");
+  const [listOwner, setListOwner] = useState(availableLists[0] || "Genel");
   const [err, setErr] = useState("");
 
   const submit = () => {
@@ -395,7 +397,7 @@ function AddPassengerSheet({
       setErr("İsim gerekli");
       return;
     }
-    onAdd({ name: n, passport: passport.trim(), phone: phone.trim() });
+    onAdd({ name: n, passport: passport.trim(), phone: phone.trim(), listOwner });
     onClose();
   };
 
@@ -423,17 +425,32 @@ function AddPassengerSheet({
           onChange={(e) => setPassport(e.target.value)}
         />
         <input
-          style={{ ...S.textarea, minHeight: "auto", padding: "12px" }}
+          style={{ ...S.textarea, minHeight: "auto", padding: "12px", marginBottom: "10px" }}
           placeholder="GSM (opsiyonel)"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
         />
 
+        {/* ✅ YENİ - Liste seçici */}
+        {availableLists.length > 1 && (
+          <select
+            style={{ ...S.textarea, minHeight: "auto", padding: "12px", marginBottom: "10px" }}
+            value={listOwner}
+            onChange={(e) => setListOwner(e.target.value)}
+          >
+            {availableLists.map((list) => (
+              <option key={list} value={list}>
+                {list}
+              </option>
+            ))}
+          </select>
+        )}
+
         {err && <div style={S.errTxt}>{err}</div>}
 
         <div style={S.btns}>
           <button style={S.btn("blue")} onClick={submit}>
-            Ekle
+            {availableLists.length > 1 ? `${listOwner} Listesine Ekle` : "Ekle"}
           </button>
           <button style={S.btn("gray")} onClick={onClose}>
             İptal
@@ -444,17 +461,7 @@ function AddPassengerSheet({
   );
 }
 
-function InsideModal({
-  passengers,
-  onClose,
-  onToggle,
-  onVisa,
-}: {
-  passengers: Passenger[];
-  onClose: () => void;
-  onToggle: (id: number) => void;
-  onVisa: (p: Passenger) => void;
-}) {
+function InsideModal({ passengers, onClose, onToggle, onVisa }: { passengers: Passenger[]; onClose: () => void; onToggle: (id: number) => void; onVisa: (p: Passenger) => void }) {
   const insiders = passengers.filter((p) => !p.checked);
   return (
     <div style={S.overlay} onClick={onClose}>
@@ -483,6 +490,8 @@ function InsideModal({
                     {p.dupOf && <span style={S.dupBadge}>⚠️ Aynı isim</span>}
                   </div>
                   <div style={{ display: "flex", gap: "8px", marginTop: "5px", flexWrap: "wrap" }}>
+                    {/* ✅ YENİ - Liste bilgisi */}
+                    {p.listOwner && <span style={S.tag("owner")}>{p.listOwner}</span>}
                     {p.passport && <span style={S.tag("blue")}>🛂 {p.passport}</span>}
                     {p.phone && (
                       <span
@@ -519,6 +528,85 @@ function InsideModal({
   );
 }
 
+// ✅ YENİ - Liste yönetim modal
+function ManageListsSheet({ lists, onSave, onClose }: { lists: string[]; onSave: (newLists: string[]) => void; onClose: () => void }) {
+  const [localLists, setLocalLists] = useState<string[]>(lists.length ? lists : ["Markella", "Atlas"]);
+  const [newListName, setNewListName] = useState("");
+
+  const addList = () => {
+    const name = newListName.trim();
+    if (!name) return;
+    if (localLists.includes(name)) {
+      alert("Bu liste adı zaten var!");
+      return;
+    }
+    setLocalLists([...localLists, name]);
+    setNewListName("");
+  };
+
+  const removeList = (name: string) => {
+    if (localLists.length === 1) {
+      alert("En az bir liste olmalı!");
+      return;
+    }
+    setLocalLists(localLists.filter((l) => l !== name));
+  };
+
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={S.sheet} onClick={(e) => e.stopPropagation()}>
+        <div style={S.handle} />
+        <div style={S.shTitle}>📋 Liste Yönetimi</div>
+        <div style={S.shHint}>Farklı acenta/kişi listelerini yönet</div>
+
+        <div style={{ marginBottom: "14px" }}>
+          {localLists.map((list) => (
+            <div key={list} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px", background: "rgba(255,255,255,0.05)", borderRadius: "8px", marginBottom: "6px" }}>
+              <span style={{ flex: 1, fontSize: "14px", color: "#fff" }}>{list}</span>
+              {localLists.length > 1 && (
+                <button
+                  style={{ background: "rgba(220,38,38,0.2)", border: "1px solid rgba(239,68,68,0.4)", borderRadius: "6px", padding: "4px 10px", color: "#fca5a5", fontSize: "12px", cursor: "pointer" }}
+                  onClick={() => removeList(list)}
+                >
+                  Sil
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
+          <input
+            style={{ ...S.textarea, minHeight: "auto", padding: "12px", flex: 1 }}
+            placeholder="Yeni liste adı (örn: Zeynep Hanım)"
+            value={newListName}
+            onChange={(e) => setNewListName(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && addList()}
+          />
+          <button style={{ ...S.btn("blue"), width: "auto", padding: "0 20px" }} onClick={addList}>
+            Ekle
+          </button>
+        </div>
+
+        <div style={S.btns}>
+          <button
+            style={S.btn("blue")}
+            onClick={() => {
+              onSave(localLists);
+              onClose();
+            }}
+          >
+            Kaydet
+          </button>
+          <button style={S.btn("gray")} onClick={onClose}>
+            İptal
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // =========================
 // MAIN
 // =========================
@@ -538,77 +626,107 @@ export default function App() {
   const [parseErr, setParseErr] = useState("");
   const [excelErr, setExcelErr] = useState("");
   const [online, setOnline] = useState(true);
-
   const [listHidden, setListHidden] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+
+  // ✅ YENİ - Liste yönetimi
+  const [customLists, setCustomLists] = useState<string[]>(["Markella", "Atlas"]);
+  const [selectedListFilter, setSelectedListFilter] = useState<string | null>(null); // null = tüm liste
+  const [showManageLists, setShowManageLists] = useState(false);
+  const [selectedListForPaste, setSelectedListForPaste] = useState<string>(customLists[0] || "Markella");
 
   const exitedRef = useRef<HTMLDivElement | null>(null);
   const stopRef = useRef<null | (() => void)>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
-
   const localTsRef = useRef<number>(0);
-  const lastPushRef = useRef<string>(""); // ✅ YENİ - gereksiz push engelleme
+  const lastPushRef = useRef<string>("");
 
-  // Load from LocalStorage once
+  // Online/offline listener
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    setOnline(navigator.onLine);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // Load from LocalStorage
   useEffect(() => {
     const tc = localStorage.getItem(LS.tourCode);
     const ps = safeJsonParse<Passenger[]>(localStorage.getItem(LS.passengers), []);
     const ts = Number(localStorage.getItem(LS.tourTs) || "0");
     const hid = localStorage.getItem(LS.hidden) === "1";
+    const lists = safeJsonParse<string[]>(localStorage.getItem(LS.lists), ["Markella", "Atlas"]);
 
     if (tc) setTourCode(tc);
     if (ps && ps.length) setPassengers(ps);
     if (ts) localTsRef.current = ts;
     setListHidden(hid);
+    setCustomLists(lists);
+    setSelectedListForPaste(lists[0] || "Markella");
   }, []);
 
-  // Save hidden
+  // Save to localStorage
   useEffect(() => {
     localStorage.setItem(LS.hidden, listHidden ? "1" : "0");
   }, [listHidden]);
 
-  // Save passengers
   useEffect(() => {
     const ts = localTsRef.current || Date.now();
     localStorage.setItem(LS.passengers, JSON.stringify(passengers));
     localStorage.setItem(LS.tourTs, String(ts));
   }, [passengers]);
 
-  // Save tourCode when active
   useEffect(() => {
     if (!tourCode) return;
     localStorage.setItem(LS.tourCode, tourCode);
   }, [tourCode]);
 
-  // ✅ İYİLEŞTİRME 1: Firebase push - gereksiz push engelleme
+  useEffect(() => {
+    localStorage.setItem(LS.lists, JSON.stringify(customLists));
+  }, [customLists]);
+
+  // Firebase push
   useEffect(() => {
     if (!tourCode) return;
-
-    // Değişiklik yoksa push etme (batarya + traffic tasarrufu)
     const curr = JSON.stringify(passengers);
     if (curr === lastPushRef.current) return;
     lastPushRef.current = curr;
 
     const ts = Date.now();
     localTsRef.current = ts;
-
     const payload: TourPayload = { passengers, ts };
-    fbSet(`tours/${tourCode}`, payload).then((ok) => setOnline(ok));
+
+    (async () => {
+      try {
+        const ok = await fbSet(`tours/${tourCode}`, payload);
+        setOnline(ok);
+      } catch {
+        setOnline(false);
+      }
+    })();
   }, [passengers, tourCode]);
 
   // Firebase listen
   useEffect(() => {
     if (!tourCode) return;
+    if (!navigator.onLine) {
+      setOnline(false);
+      return;
+    }
+
     const stop = fbListen(`tours/${tourCode}`, (remote: TourPayload | null) => {
       if (!remote || !remote.passengers) return;
       if (typeof remote.ts !== "number") return;
-
-      // Remote daha yeniyse local'i güncelle (timestamp-based conflict resolution)
       if (remote.ts >= (localTsRef.current || 0)) {
         setOnline(true);
         localTsRef.current = remote.ts;
         setPassengers(remote.passengers);
-        lastPushRef.current = JSON.stringify(remote.passengers); // ✅ YENİ - sonsuz loop engelleme
+        lastPushRef.current = JSON.stringify(remote.passengers);
       }
     });
     stopRef.current = stop;
@@ -617,15 +735,17 @@ export default function App() {
     };
   }, [tourCode]);
 
-  // ✅ İYİLEŞTİRME 2: Offline retry - 10 saniyede bir (önceden 4sn)
+  // Offline retry
   useEffect(() => {
     if (!tourCode) return;
     const t = setInterval(async () => {
-      if (online) return; // Online'sa retry'a gerek yok
-      const payload: TourPayload = { passengers, ts: localTsRef.current || Date.now() };
-      const ok = await fbSet(`tours/${tourCode}`, payload);
-      if (ok) setOnline(true);
-    }, 10000); // 4sn → 10sn (batarya dostu)
+      if (online || !navigator.onLine) return;
+      try {
+        const payload: TourPayload = { passengers, ts: localTsRef.current || Date.now() };
+        const ok = await fbSet(`tours/${tourCode}`, payload);
+        if (ok) setOnline(true);
+      } catch {}
+    }, 10000);
     return () => clearInterval(t);
   }, [online, tourCode, passengers]);
 
@@ -635,9 +755,8 @@ export default function App() {
     setPassengers([]);
     setShowConfirm(false);
     setShowMenu(false);
-
     localTsRef.current = Date.now();
-    lastPushRef.current = "[]"; // ✅ Reset
+    lastPushRef.current = "[]";
     localStorage.setItem(LS.tourCode, code);
     localStorage.setItem(LS.passengers, JSON.stringify([]));
     localStorage.setItem(LS.tourTs, String(localTsRef.current));
@@ -647,27 +766,30 @@ export default function App() {
     setTourCode(code);
     setPassengers(data.passengers || []);
     setShowJoin(false);
-
     const ts = typeof data.ts === "number" ? data.ts : Date.now();
     localTsRef.current = ts;
-    lastPushRef.current = JSON.stringify(data.passengers || []); // ✅ Reset
+    lastPushRef.current = JSON.stringify(data.passengers || []);
     localStorage.setItem(LS.tourCode, code);
     localStorage.setItem(LS.passengers, JSON.stringify(data.passengers || []));
     localStorage.setItem(LS.tourTs, String(ts));
   }, []);
 
-  const setListFromRawItems = useCallback((items: { name: string; passport: string; phone: string }[]) => {
-    const now = Date.now();
-    const mapped: Passenger[] = items.map((p) => ({
-      id: now + Math.random(),
-      name: p.name,
-      passport: p.passport || "",
-      phone: p.phone || "",
-      checked: false,
-      visaFlag: false,
-    }));
-    setPassengers(normalizePassengerList(mapped));
-  }, []);
+  const setListFromRawItems = useCallback(
+    (items: { name: string; passport: string; phone: string }[], listOwner: string) => {
+      const now = Date.now();
+      const mapped: Passenger[] = items.map((p) => ({
+        id: now + Math.random(),
+        name: p.name,
+        passport: p.passport || "",
+        phone: p.phone || "",
+        checked: false,
+        visaFlag: false,
+        listOwner, // ✅ Liste sahibi
+      }));
+      setPassengers(normalizePassengerList(mapped));
+    },
+    []
+  );
 
   const handleParse = useCallback(() => {
     setParseErr("");
@@ -677,10 +799,10 @@ export default function App() {
       setParseErr("Hiçbir isim bulunamadı. Kontrol et ve tekrar dene.");
       return;
     }
-    setListFromRawItems(raw);
+    setListFromRawItems(raw, selectedListForPaste);
     setPasteText("");
     setShowPaste(false);
-  }, [pasteText, setListFromRawItems]);
+  }, [pasteText, selectedListForPaste, setListFromRawItems]);
 
   const handleExcel = useCallback(
     async (file: File) => {
@@ -696,24 +818,27 @@ export default function App() {
           setExcelErr("Excel'den isim çekilemedi. Sütunları kontrol et.");
           return;
         }
-        setListFromRawItems(items);
+        setListFromRawItems(items, selectedListForPaste);
         setShowPaste(false);
       } catch {
         setExcelErr("Excel okunamadı. Dosya formatını kontrol et (xlsx/xls).");
       }
     },
-    [setListFromRawItems]
+    [selectedListForPaste, setListFromRawItems]
   );
 
   const toggle = useCallback((id: number) => {
+    localTsRef.current = Date.now();
     setPassengers((prev) => normalizePassengerList(prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p))));
   }, []);
 
   const toggleVisa = useCallback((id: number, val: boolean) => {
+    localTsRef.current = Date.now();
     setPassengers((prev) => normalizePassengerList(prev.map((p) => (p.id === id ? { ...p, visaFlag: val } : p))));
   }, []);
 
-  const addPassenger = useCallback((x: { name: string; passport: string; phone: string }) => {
+  const addPassenger = useCallback((x: { name: string; passport: string; phone: string; listOwner: string }) => {
+    localTsRef.current = Date.now();
     setPassengers((prev) => {
       const now = Date.now() + Math.random();
       const added: Passenger = {
@@ -723,24 +848,43 @@ export default function App() {
         phone: x.phone || "",
         checked: false,
         visaFlag: false,
+        listOwner: x.listOwner,
       };
       return normalizePassengerList([...prev, added]);
     });
   }, []);
 
-  const visaUnchecked = passengers.filter((p) => p.visaFlag && !p.checked);
-  const normalUnchecked = passengers.filter((p) => !p.visaFlag && !p.checked);
-  const checkedList = passengers.filter((p) => p.checked);
-  const sorted = useMemo(() => [...visaUnchecked, ...normalUnchecked, ...checkedList], [visaUnchecked, normalUnchecked, checkedList]);
+  // ✅ Filtrelenmiş liste
+  const displayPassengers = useMemo(() => {
+    if (!selectedListFilter) return passengers;
+    return passengers.filter((p) => p.listOwner === selectedListFilter);
+  }, [passengers, selectedListFilter]);
 
+  const visaUnchecked = displayPassengers.filter((p) => p.visaFlag && !p.checked);
+  const normalUnchecked = displayPassengers.filter((p) => !p.visaFlag && !p.checked);
+  const checkedList = displayPassengers.filter((p) => p.checked);
+  const sorted = useMemo(() => [...visaUnchecked, ...normalUnchecked, ...checkedList], [visaUnchecked, normalUnchecked, checkedList]);
   const filtered = useMemo(() => sorted.filter((p) => p.name.toLowerCase().includes(search.toLowerCase())), [sorted, search]);
 
-  const visaCount = passengers.filter((p) => p.visaFlag && !p.checked).length;
-  const checkedCount = passengers.filter((p) => p.checked).length;
-  const total = passengers.length;
+  const visaCount = displayPassengers.filter((p) => p.visaFlag && !p.checked).length;
+  const checkedCount = displayPassengers.filter((p) => p.checked).length;
+  const total = displayPassengers.length;
   const remaining = total - checkedCount;
   const pct = total ? (checkedCount / total) * 100 : 0;
   const firstCheckedIdx = filtered.findIndex((p) => p.checked);
+
+  // ✅ Liste istatistikleri
+  const listStats = useMemo(() => {
+    const stats = new Map<string, { total: number; checked: number }>();
+    passengers.forEach((p) => {
+      const owner = p.listOwner || "Genel";
+      if (!stats.has(owner)) stats.set(owner, { total: 0, checked: 0 });
+      const s = stats.get(owner)!;
+      s.total++;
+      if (p.checked) s.checked++;
+    });
+    return stats;
+  }, [passengers]);
 
   // ---- LANDING ----
   if (!tourCode) {
@@ -763,10 +907,7 @@ export default function App() {
             🆕 Yeni Tur Başlat
           </button>
 
-          <button
-            style={{ ...S.btn("gray"), width: "100%", maxWidth: "280px", marginTop: "10px", border: "1px solid rgba(255,255,255,0.15)" }}
-            onClick={() => setShowJoin(true)}
-          >
+          <button style={{ ...S.btn("gray"), width: "100%", maxWidth: "280px", marginTop: "10px", border: "1px solid rgba(255,255,255,0.15)" }} onClick={() => setShowJoin(true)}>
             🔗 Tur Koduna Katıl
           </button>
 
@@ -781,7 +922,7 @@ export default function App() {
                 if (ps) {
                   const parsed = JSON.parse(ps);
                   setPassengers(parsed);
-                  lastPushRef.current = JSON.stringify(parsed); // ✅ Reset
+                  lastPushRef.current = JSON.stringify(parsed);
                 }
                 if (ts) localTsRef.current = Number(ts);
               }}
@@ -839,6 +980,16 @@ export default function App() {
                 <div
                   style={S.menuItem}
                   onClick={() => {
+                    setShowMenu(false);
+                    setShowManageLists(true);
+                  }}
+                >
+                  📑 Listeler Yönet
+                </div>
+
+                <div
+                  style={S.menuItem}
+                  onClick={() => {
                     setListHidden((v) => !v);
                     setShowMenu(false);
                   }}
@@ -860,7 +1011,7 @@ export default function App() {
                   style={S.menuItem}
                   onClick={() => {
                     setShowMenu(false);
-                    setTourCode(null); // çıkış (liste silinmez)
+                    setTourCode(null);
                   }}
                 >
                   🚪 Çıkış Yap
@@ -893,11 +1044,41 @@ export default function App() {
               transition: "all 0.3s",
             }}
           />
-          <span style={{ fontSize: "11px", color: online ? "rgba(16,185,129,0.8)" : "rgba(245,158,11,0.8)" }}>
-            {online ? "Canlı Sync" : "Çevrimdışı (değişiklikler kaybolmaz)"}
-          </span>
+          <span style={{ fontSize: "11px", color: online ? "rgba(16,185,129,0.8)" : "rgba(245,158,11,0.8)" }}>{online ? "Canlı Sync" : "Çevrimdışı (değişiklikler kaybolmaz)"}</span>
           <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.22)", marginLeft: "auto", letterSpacing: "1px" }}>{tourCode}</span>
         </div>
+
+        {/* ✅ YENİ - Liste filtresi */}
+        {customLists.length > 1 && (
+          <div style={{ display: "flex", gap: "6px", marginBottom: "12px", overflowX: "auto", paddingBottom: "4px" }}>
+            <button
+              style={{
+                ...S.filterBtn,
+                background: !selectedListFilter ? "linear-gradient(135deg, #3b82f6, #2563eb)" : "rgba(255,255,255,0.05)",
+                border: !selectedListFilter ? "1px solid rgba(59,130,246,0.4)" : "1px solid rgba(255,255,255,0.1)",
+              }}
+              onClick={() => setSelectedListFilter(null)}
+            >
+              Tüm Liste ({passengers.length})
+            </button>
+            {customLists.map((list) => {
+              const stats = listStats.get(list);
+              return (
+                <button
+                  key={list}
+                  style={{
+                    ...S.filterBtn,
+                    background: selectedListFilter === list ? "linear-gradient(135deg, #3b82f6, #2563eb)" : "rgba(255,255,255,0.05)",
+                    border: selectedListFilter === list ? "1px solid rgba(59,130,246,0.4)" : "1px solid rgba(255,255,255,0.1)",
+                  }}
+                  onClick={() => setSelectedListFilter(list)}
+                >
+                  {list} ({stats?.total || 0})
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Visa Banner */}
         {visaCount > 0 && (
@@ -1008,6 +1189,8 @@ export default function App() {
                           </div>
 
                           <div style={{ display: "flex", gap: "8px", marginTop: "5px", flexWrap: "wrap" }}>
+                            {/* ✅ Liste sahibi */}
+                            {p.listOwner && <span style={S.tag("owner")}>{p.listOwner}</span>}
                             {p.passport && <span style={S.tag("blue")}>🛂 {p.passport}</span>}
 
                             {p.phone && (
@@ -1063,6 +1246,21 @@ export default function App() {
             <div style={S.shTitle}>📋 Liste Ekle</div>
             <div style={S.shHint}>Excel yükleyebilir veya manuel yapıştırabilirsin.</div>
 
+            {/* ✅ YENİ - Liste seçici */}
+            {customLists.length > 1 && (
+              <select
+                style={{ ...S.textarea, minHeight: "auto", padding: "12px", marginBottom: "10px" }}
+                value={selectedListForPaste}
+                onChange={(e) => setSelectedListForPaste(e.target.value)}
+              >
+                {customLists.map((list) => (
+                  <option key={list} value={list}>
+                    {list}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
               <input
                 ref={fileRef}
@@ -1103,7 +1301,7 @@ export default function App() {
 
             <div style={S.btns}>
               <button style={S.btn("blue")} onClick={handleParse}>
-                Listeyi Oluştur
+                {customLists.length > 1 ? `${selectedListForPaste} Listesine Ekle` : "Listeyi Oluştur"}
               </button>
               <button
                 style={S.btn("gray")}
@@ -1120,19 +1318,12 @@ export default function App() {
         </div>
       )}
 
-      {showConfirm && (
-        <ConfirmDialog
-          onConfirm={() => {
-            createTour();
-          }}
-          onCancel={() => setShowConfirm(false)}
-        />
-      )}
-
+      {showConfirm && <ConfirmDialog onConfirm={createTour} onCancel={() => setShowConfirm(false)} />}
       {showJoin && <JoinSheet onJoin={joinTour} onClose={() => setShowJoin(false)} />}
-      {showAdd && <AddPassengerSheet onAdd={addPassenger} onClose={() => setShowAdd(false)} />}
+      {showAdd && <AddPassengerSheet availableLists={customLists} onAdd={addPassenger} onClose={() => setShowAdd(false)} />}
       {visaPassenger && <VisaSheet passenger={visaPassenger} onToggle={toggleVisa} onClose={() => setVisaPassenger(null)} />}
-      {showInside && <InsideModal passengers={passengers} onClose={() => setShowInside(false)} onToggle={toggle} onVisa={(p) => setVisaPassenger(p)} />}
+      {showInside && <InsideModal passengers={displayPassengers} onClose={() => setShowInside(false)} onToggle={toggle} onVisa={(p) => setVisaPassenger(p)} />}
+      {showManageLists && <ManageListsSheet lists={customLists} onSave={setCustomLists} onClose={() => setShowManageLists(false)} />}
     </div>
   );
 }
@@ -1226,6 +1417,18 @@ const S: any = {
     zIndex: 200,
   },
   menuItem: { padding: "10px 16px", fontSize: "13px", color: "rgba(255,255,255,0.8)", cursor: "pointer", whiteSpace: "nowrap" },
+
+  // ✅ YENİ - Filtre butonları
+  filterBtn: {
+    padding: "8px 16px",
+    borderRadius: "8px",
+    fontSize: "12px",
+    fontWeight: 600,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    transition: "all 0.2s",
+    color: "#fff",
+  },
 
   visaBanner: {
     display: "flex",
@@ -1340,6 +1543,7 @@ const S: any = {
 
   tag: (color: string) => {
     const m: any = {
+      owner: { bg: "rgba(139,92,246,0.12)", txt: "#a78bfa", bd: "rgba(139,92,246,0.25)" }, // ✅ YENİ - Liste sahibi
       blue: { bg: "rgba(59,130,246,0.12)", txt: "#60a5fa", bd: "rgba(59,130,246,0.2)" },
       green: { bg: "rgba(16,185,129,0.12)", txt: "#34d399", bd: "rgba(16,185,129,0.2)" },
       "visa-on": { bg: "rgba(220,38,38,0.2)", txt: "#fca5a5", bd: "rgba(239,68,68,0.4)" },
