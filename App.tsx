@@ -68,6 +68,11 @@ function fbListen(path: string, cb: (d: any) => void) {
     last = "";
   const poll = async () => {
     if (!on) return;
+    // Offline'sa poll yapma
+    if (!navigator.onLine) {
+      setTimeout(poll, 2500);
+      return;
+    }
     const d = await fbGet(path);
     const s = JSON.stringify(d);
     if (s !== last) {
