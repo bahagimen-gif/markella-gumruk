@@ -26,39 +26,22 @@ const FB = {
 
 const dbURL = (path: string) => `${FB.databaseURL}/${path}.json`;
 
-// Timeout wrapper - fetch'i zorla durdur
-function fetchWithTimeout(url: string, options: any = {}, timeout = 5000) {
-  return Promise.race([
-    fetch(url, options),
-    new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('timeout')), timeout)
-    )
-  ]);
-}
-
 async function fbGet(path: string) {
   try {
-    // Offline'sa hiç deneme
-    if (!navigator.onLine) return null;
-    
-    const r = await fetchWithTimeout(dbURL(path), {}, 5000);
-    return (r as Response).ok ? await (r as Response).json() : null;
+    const r = await fetch(dbURL(path));
+    return r.ok ? await r.json() : null;
   } catch {
     return null;
   }
 }
-
 async function fbSet(path: string, data: any) {
   try {
-    // Offline'sa hiç deneme
-    if (!navigator.onLine) return false;
-    
-    const r = await fetchWithTimeout(dbURL(path), {
+    const r = await fetch(dbURL(path), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
-    }, 5000);
-    return (r as Response).ok;
+    });
+    return r.ok;
   } catch {
     return false;
   }
@@ -68,11 +51,6 @@ function fbListen(path: string, cb: (d: any) => void) {
     last = "";
   const poll = async () => {
     if (!on) return;
-    // Offline'sa poll yapma
-    if (!navigator.onLine) {
-      setTimeout(poll, 2500);
-      return;
-    }
     const d = await fbGet(path);
     const s = JSON.stringify(d);
     if (s !== last) {
@@ -560,22 +538,6 @@ export default function App() {
   const [parseErr, setParseErr] = useState("");
   const [excelErr, setExcelErr] = useState("");
   const [online, setOnline] = useState(true);
-  // Online/offline durumu dinle
-useEffect(() => {
-  const handleOnline = () => setOnline(true);
-  const handleOffline = () => setOnline(false);
-  
-  window.addEventListener('online', handleOnline);
-  window.addEventListener('offline', handleOffline);
-  
-  // İlk durumu kontrol et
-  setOnline(navigator.onLine);
-  
-  return () => {
-    window.removeEventListener('online', handleOnline);
-    window.removeEventListener('offline', handleOffline);
-  };
-}, []);
 
   const [listHidden, setListHidden] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -618,47 +580,26 @@ useEffect(() => {
     localStorage.setItem(LS.tourCode, tourCode);
   }, [tourCode]);
 
- // ✅ İYİLEŞTİRME 1: Firebase push - gereksiz push engelleme
-useEffect(() => {
-  if (!tourCode) return;
+  // ✅ İYİLEŞTİRME 1: Firebase push - gereksiz push engelleme
+  useEffect(() => {
+    if (!tourCode) return;
 
-  // Değişiklik yoksa push etme (batarya + traffic tasarrufu)
-  const curr = JSON.stringify(passengers);
-  if (curr === lastPushRef.current) return;
-  lastPushRef.current = curr;
+    // Değişiklik yoksa push etme (batarya + traffic tasarrufu)
+    const curr = JSON.stringify(passengers);
+    if (curr === lastPushRef.current) return;
+    lastPushRef.current = curr;
 
-  const ts = Date.now();
-  localTsRef.current = ts;
+    const ts = Date.now();
+    localTsRef.current = ts;
 
-  const payload: TourPayload = { passengers, ts };
-  
-  // Async çalıştır - UI'yi bloklamasın
-  (async () => {
-    try {
-      const ok = await fbSet(`tours/${tourCode}`, payload);
-      setOnline(ok);
-    } catch {
-      setOnline(false);
-    }
-  })();
-}, [passengers, tourCode]);
-  
- // Firebase listen - sadece online'da
-useEffect(() => {
-  if (!tourCode) return;
-  
-  // Offline'sa listen başlatma (donmayı engellemek için)
-  if (!navigator.onLine) {
-    setOnline(false);
-    return;
-  }
-  
-  const stop = fbListen(`tours/${tourCode}`, (remote: TourPayload | null) => {
-  
-  // Online değilken listen'a gerek yok (offline mode)
-  if (!navigator.onLine) return;
-  
-  const stop = fbListen(`tours/${tourCode}`, (remote: TourPayload | null) => {
+    const payload: TourPayload = { passengers, ts };
+    fbSet(`tours/${tourCode}`, payload).then((ok) => setOnline(ok));
+  }, [passengers, tourCode]);
+
+  // Firebase listen
+  useEffect(() => {
+    if (!tourCode) return;
+    const stop = fbListen(`tours/${tourCode}`, (remote: TourPayload | null) => {
       if (!remote || !remote.passengers) return;
       if (typeof remote.ts !== "number") return;
 
@@ -676,23 +617,17 @@ useEffect(() => {
     };
   }, [tourCode]);
 
- // ✅ İYİLEŞTİRME 2: Offline retry - 10 saniyede bir (önceden 4sn)
-useEffect(() => {
-  if (!tourCode) return;
-  const t = setInterval(async () => {
-    // Online'sa retry'a gerek yok
-    if (online || !navigator.onLine) return;
-    
-    try {
+  // ✅ İYİLEŞTİRME 2: Offline retry - 10 saniyede bir (önceden 4sn)
+  useEffect(() => {
+    if (!tourCode) return;
+    const t = setInterval(async () => {
+      if (online) return; // Online'sa retry'a gerek yok
       const payload: TourPayload = { passengers, ts: localTsRef.current || Date.now() };
       const ok = await fbSet(`tours/${tourCode}`, payload);
       if (ok) setOnline(true);
-    } catch {
-      // Sessizce devam et
-    }
-  }, 10000);
-  return () => clearInterval(t);
-}, [online, tourCode, passengers]);
+    }, 10000); // 4sn → 10sn (batarya dostu)
+    return () => clearInterval(t);
+  }, [online, tourCode, passengers]);
 
   const createTour = useCallback(() => {
     const code = genCode();
@@ -771,18 +706,15 @@ useEffect(() => {
   );
 
   const toggle = useCallback((id: number) => {
-  localTsRef.current = Date.now(); // ✅ Timestamp güncelle
-  setPassengers((prev) => normalizePassengerList(prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p))));
-}, []);
+    setPassengers((prev) => normalizePassengerList(prev.map((p) => (p.id === id ? { ...p, checked: !p.checked } : p))));
+  }, []);
 
   const toggleVisa = useCallback((id: number, val: boolean) => {
-  localTsRef.current = Date.now(); // ✅ Timestamp güncelle
-  setPassengers((prev) => normalizePassengerList(prev.map((p) => (p.id === id ? { ...p, visaFlag: val } : p))));
-}, []);
+    setPassengers((prev) => normalizePassengerList(prev.map((p) => (p.id === id ? { ...p, visaFlag: val } : p))));
+  }, []);
 
   const addPassenger = useCallback((x: { name: string; passport: string; phone: string }) => {
-  localTsRef.current = Date.now(); // ✅ Timestamp güncelle
-  setPassengers((prev) => {
+    setPassengers((prev) => {
       const now = Date.now() + Math.random();
       const added: Passenger = {
         id: now,
