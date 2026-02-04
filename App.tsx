@@ -618,25 +618,42 @@ useEffect(() => {
     localStorage.setItem(LS.tourCode, tourCode);
   }, [tourCode]);
 
-  // ✅ İYİLEŞTİRME 1: Firebase push - gereksiz push engelleme
-  useEffect(() => {
-    if (!tourCode) return;
-
-    // Değişiklik yoksa push etme (batarya + traffic tasarrufu)
-    const curr = JSON.stringify(passengers);
-    if (curr === lastPushRef.current) return;
-    lastPushRef.current = curr;
-
-    const ts = Date.now();
-    localTsRef.current = ts;
-
-    const payload: TourPayload = { passengers, ts };
-    fbSet(`tours/${tourCode}`, payload).then((ok) => setOnline(ok));
-  }, [passengers, tourCode]);
-
- // Firebase listen - sadece online'da çalışsın
+ // ✅ İYİLEŞTİRME 1: Firebase push - gereksiz push engelleme
 useEffect(() => {
   if (!tourCode) return;
+
+  // Değişiklik yoksa push etme (batarya + traffic tasarrufu)
+  const curr = JSON.stringify(passengers);
+  if (curr === lastPushRef.current) return;
+  lastPushRef.current = curr;
+
+  const ts = Date.now();
+  localTsRef.current = ts;
+
+  const payload: TourPayload = { passengers, ts };
+  
+  // Async çalıştır - UI'yi bloklamasın
+  (async () => {
+    try {
+      const ok = await fbSet(`tours/${tourCode}`, payload);
+      setOnline(ok);
+    } catch {
+      setOnline(false);
+    }
+  })();
+}, [passengers, tourCode]);
+  
+ // Firebase listen - sadece online'da
+useEffect(() => {
+  if (!tourCode) return;
+  
+  // Offline'sa listen başlatma (donmayı engellemek için)
+  if (!navigator.onLine) {
+    setOnline(false);
+    return;
+  }
+  
+  const stop = fbListen(`tours/${tourCode}`, (remote: TourPayload | null) => {
   
   // Online değilken listen'a gerek yok (offline mode)
   if (!navigator.onLine) return;
