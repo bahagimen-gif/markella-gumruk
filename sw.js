@@ -1,24 +1,52 @@
-const CACHE_NAME = 'markella-v2'; // Versiyonu v2 yaptık ki taze olsun
-const assets = [
-  './',
-  './index.html',
-  // Eğer başka büyük .js veya .css dosyaların varsa isimlerini buraya ekleyebilirsin
-];
+const CACHE = "markella-v3";
 
-// Uygulamayı telefona yükler (İnternet varken ilk açılışta)
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(assets);
-    })
+// Sadece ana kabuk — diğerleri otomatik cache olacak
+const CORE = ["/", "/index.html"];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(CORE))
   );
+  self.skipWaiting();
 });
 
-// İnternet yokken dosyaları hafızadan getirir
-self.addEventListener('fetch', (e) => {
-  e.respondWith(
-    caches.match(e.request).then(response => {
-      return response || fetch(e.request);
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))
+      )
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  if (url.origin !== self.location.origin) return;
+
+  // SPA routing fix
+  if (req.mode === "navigate") {
+    event.respondWith(
+      caches.match("/index.html").then((r) => r || fetch(req))
+    );
+    return;
+  }
+
+  // JS/CSS/IMG cache runtime
+  event.respondWith(
+    caches.match(req).then((cached) => {
+      const fetchPromise = fetch(req)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+          return res;
+        })
+        .catch(() => cached);
+
+      return cached || fetchPromise;
     })
   );
 });
