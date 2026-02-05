@@ -1146,10 +1146,17 @@ export default function App() {
           </div>
         ) : (
           <>
-            {passengers.length > 0 && (
+           // Artık arama kutusu sadece gerçekten liste boşsa gizlenir
+{passengers.length > 0 && (
   <div style={S.searchWrap}>
     <span style={S.searchIco}>🔍</span>
-    <input type="text" placeholder="İsim ara..." ... />
+    <input 
+      type="text" 
+      placeholder="İsim ara..." 
+      value={search} 
+      onChange={(e) => setSearch(e.target.value)} 
+      style={S.searchInput} 
+    />
   </div>
 )}
 
