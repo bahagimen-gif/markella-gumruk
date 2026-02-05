@@ -1054,7 +1054,7 @@ export default function App() {
 
         {/* Liste filtresi */}
         {customLists.length > 1 && (
-          <div style={{ display: "flex", gap: "6px", marginBottom: "12px", overflowX: "auto", paddingBottom: "4px" }}>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "12px", overflowX: "auto", paddingBottom: "44px" }}>
             <button
               style={{
                 ...S.filterBtn,
