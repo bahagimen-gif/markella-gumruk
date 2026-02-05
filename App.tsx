@@ -1462,7 +1462,7 @@ const S: any = {
   statNum: { fontSize: "20px", fontWeight: 700, color: "#fff" },
   statLbl: { fontSize: "11px", color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "2px" },
 
-  bodyWithStickyHeader: { padding: "24px 16px 120px", position: "relative", zIndex: 1, maxWidth: "540px", margin: "0 auto" },
+  bodyWithStickyHeader: { padding: "100px 16px 120px", position: "relative", zIndex: 1, maxWidth: "540px", margin: "0 auto" },
 
   searchWrap: { position: "relative", marginTop: "14px" },
   searchInput: { width: "100%", padding: "13px 16px 13px 44px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "#fff", fontSize: "15px", outline: "none", boxSizing: "border-box" },
