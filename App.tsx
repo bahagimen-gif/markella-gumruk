@@ -1460,7 +1460,7 @@ const S: any = {
     boxShadow: "0 0 16px rgba(220,38,38,0.15)",
   },
 
-  progBar: { width: "100%", height: "6px", background: "rgba(255,255,255,0.08)", borderRadius: "3px", overflow: "hidden", marginBottom: "14px" },
+  progBar: { width: "100%", height: "6px", background: "rgba(255,255,255,0.08)", borderRadius: "3px", overflow: "hidden", marginBottom: "28px" },
   progFill: { height: "100%", background: "linear-gradient(90deg, #3b82f6, #10b981)", borderRadius: "3px", transition: "width 0.4s cubic-bezier(0.4,0,0.2,1)" },
 
   statsRow: { display: "flex", gap: "10px" },
