@@ -1146,12 +1146,12 @@ export default function App() {
           </div>
         ) : (
           <>
-            {total > 0 && (
-              <div style={S.searchWrap}>
-                <span style={S.searchIco}>🔍</span>
-                <input type="text" placeholder="İsim ara..." value={search} onChange={(e) => setSearch(e.target.value)} style={S.searchInput} />
-              </div>
-            )}
+            {passengers.length > 0 && (
+  <div style={S.searchWrap}>
+    <span style={S.searchIco}>🔍</span>
+    <input type="text" placeholder="İsim ara..." ... />
+  </div>
+)}
 
             {total === 0 ? (
               <div style={S.empty}>
