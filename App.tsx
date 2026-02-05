@@ -1132,6 +1132,20 @@ export default function App() {
             </div>
           </>
         )}
+
+        {/* ✅ Arama kutusu - Header içinde sabit kalır */}
+        {passengers.length > 0 && (
+          <div style={S.searchWrap}>
+            <span style={S.searchIco}>🔍</span>
+            <input 
+              type="text" 
+              placeholder="İsim ara..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              style={S.searchInput} 
+            />
+          </div>
+        )}
       </div>
 
       {/* BODY */}
@@ -1146,20 +1160,6 @@ export default function App() {
           </div>
         ) : (
           <>
-           // Artık arama kutusu sadece gerçekten liste boşsa gizlenir
-{passengers.length > 0 && (
-  <div style={S.searchWrap}>
-    <span style={S.searchIco}>🔍</span>
-    <input 
-      type="text" 
-      placeholder="İsim ara..." 
-      value={search} 
-      onChange={(e) => setSearch(e.target.value)} 
-      style={S.searchInput} 
-    />
-  </div>
-)}
-
             {total === 0 ? (
               <div style={S.empty}>
                 <div style={{ fontSize: "48px", marginBottom: "12px" }}>📋</div>
@@ -1461,7 +1461,7 @@ const S: any = {
 
   bodyWithStickyHeader: { padding: "24px 16px 120px", position: "relative", zIndex: 1, maxWidth: "540px", margin: "0 auto" },
 
-  searchWrap: { position: "relative", marginBottom: "14px" },
+  searchWrap: { position: "relative", marginTop: "14px" },
   searchInput: { width: "100%", padding: "13px 16px 13px 44px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "#fff", fontSize: "15px", outline: "none", boxSizing: "border-box" },
   searchIco: { position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.35)", fontSize: "18px", pointerEvents: "none" },
 
@@ -1609,8 +1609,8 @@ const S: any = {
 
   textarea: { width: "100%", minHeight: "140px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", color: "#fff", fontSize: "14px", padding: "12px", resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" },
   errTxt: { color: "#f87171", fontSize: "12px", marginTop: "8px" },
-  select: { width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", color: "#fff", fontSize: "14px", padding: "12px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" },
-selectOption: { background: "#1e3356", color: "#fff", padding: "8px" },
+  select: { width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", color: "#fff", fontSize: "14px", padding: "12px", outline: "none", boxSizing: "border-box", fontFamily: "inherit", marginBottom: "10px" },
+  selectOption: { background: "#1e3356", color: "#fff", padding: "8px" },
 
   fab: { position: "fixed", bottom: "30px", right: "24px", width: "58px", height: "58px", borderRadius: "16px", background: "linear-gradient(135deg,#3b82f6,#2563eb)", border: "none", color: "#fff", fontSize: "28px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 6px 24px rgba(59,130,246,0.4)", zIndex: 900 },
 };
