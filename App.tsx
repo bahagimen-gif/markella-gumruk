@@ -1389,12 +1389,11 @@ const S: any = {
   landingSub: { fontSize: "14px", color: "rgba(255,255,255,0.4)", marginBottom: "40px", lineHeight: 1.6, maxWidth: "260px" },
 
   headerSticky: {
-    position: "sticky",
-    top: 0,
+    position: "relative",
     zIndex: 999,
     background: "linear-gradient(135deg, rgba(30,50,90,0.98), rgba(20,35,70,0.98))",
     borderBottom: "1px solid rgba(59,130,246,0.15)",
-    padding: "20px 20px 16px",
+    padding: "20px 20px 20px",
     backdropFilter: "blur(8px)",
   },
   hTop: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" },
@@ -1459,7 +1458,7 @@ const S: any = {
   statNum: { fontSize: "20px", fontWeight: 700, color: "#fff" },
   statLbl: { fontSize: "11px", color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "2px" },
 
-  bodyWithStickyHeader: { padding: "24px 16px 120px", position: "relative", zIndex: 1, maxWidth: "540px", margin: "0 auto" },
+  bodyWithStickyHeader: { padding: "20px 16px 120px", position: "relative", zIndex: 1, maxWidth: "540px", margin: "0 auto" },
 
   searchWrap: { position: "relative", marginTop: "14px" },
   searchInput: { width: "100%", padding: "13px 16px 13px 44px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "#fff", fontSize: "15px", outline: "none", boxSizing: "border-box" },
