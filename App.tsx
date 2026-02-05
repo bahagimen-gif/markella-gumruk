@@ -947,6 +947,8 @@ export default function App() {
 
       {/* HEADER - Sticky Top Bar */}
       <div style={S.headerSticky}>
+      {/* HEADER - Tamamen Sticky */}
+      <div style={S.headerSticky}>
         <div style={S.hTop}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <img src={LOGO} alt="Markella Travel" style={{ height: "26px", width: "auto", display: "block", filter: "drop-shadow(0 2px 10px rgba(0,0,0,0.25))" }} />
@@ -1035,7 +1037,7 @@ export default function App() {
         </div>
 
         {/* Status */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
           <span
             style={{
               width: "8px",
@@ -1049,11 +1051,8 @@ export default function App() {
           <span style={{ fontSize: "11px", color: online ? "rgba(16,185,129,0.8)" : "rgba(245,158,11,0.8)" }}>{online ? "Canlı Sync" : "Çevrimdışı (değişiklikler kaybolmaz)"}</span>
           <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.22)", marginLeft: "auto", letterSpacing: "1px" }}>{tourCode}</span>
         </div>
-      </div>
 
-      {/* HEADER - Scrollable Section */}
-      <div style={S.headerScrollable}>
-        {/* ✅ YENİ - Liste filtresi */}
+        {/* Liste filtresi */}
         {customLists.length > 1 && (
           <div style={{ display: "flex", gap: "6px", marginBottom: "12px", overflowX: "auto", paddingBottom: "4px" }}>
             <button
@@ -1136,7 +1135,7 @@ export default function App() {
           </>
         )}
 
-        {/* ✅ Arama kutusu - Header içinde sabit kalır */}
+        {/* Arama kutusu */}
         {passengers.length > 0 && (
           <div style={S.searchWrap}>
             <span style={S.searchIco}>🔍</span>
@@ -1397,14 +1396,11 @@ const S: any = {
     zIndex: 999,
     background: "linear-gradient(135deg, rgba(30,50,90,0.98), rgba(20,35,70,0.98))",
     borderBottom: "1px solid rgba(59,130,246,0.15)",
-    padding: "20px 20px 10px",
+    padding: "16px 16px 16px",
     backdropFilter: "blur(8px)",
     boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-  },
-  headerScrollable: {
-    background: "linear-gradient(135deg, rgba(30,50,90,0.98), rgba(20,35,70,0.98))",
-    padding: "10px 20px 20px",
-    borderBottom: "1px solid rgba(59,130,246,0.15)",
+    maxHeight: "85vh",
+    overflowY: "auto",
   },
   hTop: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" },
   hTitle: { fontSize: "18px", fontWeight: 800, letterSpacing: "-0.4px", color: "#fff" },
@@ -1460,7 +1456,7 @@ const S: any = {
     boxShadow: "0 0 16px rgba(220,38,38,0.15)",
   },
 
-  progBar: { width: "100%", height: "6px", background: "rgba(255,255,255,0.08)", borderRadius: "3px", overflow: "hidden", marginBottom: "28px" },
+  progBar: { width: "100%", height: "6px", background: "rgba(255,255,255,0.08)", borderRadius: "3px", overflow: "hidden", marginBottom: "14px" },
   progFill: { height: "100%", background: "linear-gradient(90deg, #3b82f6, #10b981)", borderRadius: "3px", transition: "width 0.4s cubic-bezier(0.4,0,0.2,1)" },
 
   statsRow: { display: "flex", gap: "10px" },
@@ -1468,7 +1464,7 @@ const S: any = {
   statNum: { fontSize: "20px", fontWeight: 700, color: "#fff" },
   statLbl: { fontSize: "11px", color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.5px", marginTop: "2px" },
 
-  bodyWithStickyHeader: { padding: "20px 16px 120px", position: "relative", zIndex: 1, maxWidth: "540px", margin: "0 auto" },
+  bodyWithStickyHeader: { padding: "24px 16px 120px", position: "relative", zIndex: 1, maxWidth: "540px", margin: "0 auto" },
 
   searchWrap: { position: "relative", marginTop: "14px" },
   searchInput: { width: "100%", padding: "13px 16px 13px 44px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "#fff", fontSize: "15px", outline: "none", boxSizing: "border-box" },
