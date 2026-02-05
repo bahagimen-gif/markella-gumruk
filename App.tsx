@@ -432,19 +432,19 @@ function AddPassengerSheet({
         />
 
         {/* ✅ YENİ - Liste seçici */}
-        {availableLists.length > 1 && (
-          <select
-            style={{ ...S.textarea, minHeight: "auto", padding: "12px", marginBottom: "10px" }}
-            value={listOwner}
-            onChange={(e) => setListOwner(e.target.value)}
-          >
-            {availableLists.map((list) => (
-              <option key={list} value={list}>
-                {list}
-              </option>
-            ))}
-          </select>
-        )}
+       {availableLists.length > 1 && (
+  <select
+    style={S.select}
+    value={listOwner}
+    onChange={(e) => setListOwner(e.target.value)}
+  >
+    {availableLists.map((list) => (
+      <option key={list} value={list} style={S.selectOption}>
+        {list}
+      </option>
+    ))}
+  </select>
+)}
 
         {err && <div style={S.errTxt}>{err}</div>}
 
@@ -774,22 +774,24 @@ export default function App() {
     localStorage.setItem(LS.tourTs, String(ts));
   }, []);
 
-  const setListFromRawItems = useCallback(
-    (items: { name: string; passport: string; phone: string }[], listOwner: string) => {
-      const now = Date.now();
-      const mapped: Passenger[] = items.map((p) => ({
-        id: now + Math.random(),
-        name: p.name,
-        passport: p.passport || "",
-        phone: p.phone || "",
-        checked: false,
-        visaFlag: false,
-        listOwner, // ✅ Liste sahibi
-      }));
-      setPassengers(normalizePassengerList(mapped));
-    },
-    []
-  );
+ const setListFromRawItems = useCallback(
+  (items: { name: string; passport: string; phone: string }[], listOwner: string) => {
+    localTsRef.current = Date.now(); // ✅ Timestamp güncelle
+    const now = Date.now();
+    const mapped: Passenger[] = items.map((p) => ({
+      id: now + Math.random(),
+      name: p.name,
+      passport: p.passport || "",
+      phone: p.phone || "",
+      checked: false,
+      visaFlag: false,
+      listOwner,
+    }));
+    // ✅ ESKİLERİ SİLME - EKLE!
+    setPassengers((prev) => normalizePassengerList([...prev, ...mapped]));
+  },
+  []
+);
 
   const handleParse = useCallback(() => {
     setParseErr("");
@@ -1247,19 +1249,19 @@ export default function App() {
             <div style={S.shHint}>Excel yükleyebilir veya manuel yapıştırabilirsin.</div>
 
             {/* ✅ YENİ - Liste seçici */}
-            {customLists.length > 1 && (
-              <select
-                style={{ ...S.textarea, minHeight: "auto", padding: "12px", marginBottom: "10px" }}
-                value={selectedListForPaste}
-                onChange={(e) => setSelectedListForPaste(e.target.value)}
-              >
-                {customLists.map((list) => (
-                  <option key={list} value={list}>
-                    {list}
-                  </option>
-                ))}
-              </select>
-            )}
+           {customLists.length > 1 && (
+  <select
+    style={S.select}
+    value={selectedListForPaste}
+    onChange={(e) => setSelectedListForPaste(e.target.value)}
+  >
+    {customLists.map((list) => (
+      <option key={list} value={list} style={S.selectOption}>
+        {list}
+      </option>
+    ))}
+  </select>
+)}
 
             <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
               <input
@@ -1600,6 +1602,8 @@ const S: any = {
 
   textarea: { width: "100%", minHeight: "140px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", color: "#fff", fontSize: "14px", padding: "12px", resize: "vertical", outline: "none", boxSizing: "border-box", fontFamily: "inherit" },
   errTxt: { color: "#f87171", fontSize: "12px", marginTop: "8px" },
+  select: { width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "10px", color: "#fff", fontSize: "14px", padding: "12px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" },
+selectOption: { background: "#1e3356", color: "#fff", padding: "8px" },
 
   fab: { position: "fixed", bottom: "30px", right: "24px", width: "58px", height: "58px", borderRadius: "16px", background: "linear-gradient(135deg,#3b82f6,#2563eb)", border: "none", color: "#fff", fontSize: "28px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 6px 24px rgba(59,130,246,0.4)", zIndex: 900 },
 };
