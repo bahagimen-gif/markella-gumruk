@@ -945,8 +945,6 @@ export default function App() {
       <div style={S.deco1} />
       <div style={S.deco2} />
 
-      {/* HEADER - Sticky Top Bar */}
-      <div style={S.headerSticky}>
       {/* HEADER - Tamamen Sticky */}
       <div style={S.headerSticky}>
         <div style={S.hTop}>
@@ -1054,7 +1052,7 @@ export default function App() {
 
         {/* Liste filtresi */}
         {customLists.length > 1 && (
-          <div style={{ display: "flex", gap: "6px", marginBottom: "12px", overflowX: "auto", paddingBottom: "44px" }}>
+          <div style={{ display: "flex", gap: "6px", marginBottom: "12px", overflowX: "auto", paddingBottom: "4px" }}>
             <button
               style={{
                 ...S.filterBtn,
