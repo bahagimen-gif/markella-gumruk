@@ -1106,13 +1106,25 @@ export default function App() {
                 <div style={S.statLbl}>Toplam</div>
               </div>
 
+              {/* ✅ DÜZELTİLDİ - Scroll davranışı */}
               <div
                 style={{
                   ...S.statCard,
                   cursor: checkedCount > 0 ? "pointer" : "default",
                   border: checkedCount > 0 ? "1px solid rgba(16,185,129,0.35)" : "1px solid rgba(255,255,255,0.07)",
                 }}
-                onClick={checkedCount > 0 ? () => exitedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }) : undefined}
+                onClick={checkedCount > 0 ? () => {
+                  if (exitedRef.current) {
+                    const headerHeight = document.querySelector('[style*="position: sticky"]')?.getBoundingClientRect().height || 0;
+                    const elementPosition = exitedRef.current.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - headerHeight - 20;
+                    
+                    window.scrollTo({
+                      top: offsetPosition,
+                      behavior: "smooth"
+                    });
+                  }
+                } : undefined}
               >
                 <div style={{ ...S.statNum, color: "#10b981" }}>{checkedCount}</div>
                 <div style={S.statLbl}>↓ Çıktı</div>
