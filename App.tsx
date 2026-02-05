@@ -945,7 +945,7 @@ export default function App() {
       <div style={S.deco1} />
       <div style={S.deco2} />
 
-      {/* HEADER */}
+      {/* HEADER - Sticky Top Bar */}
       <div style={S.headerSticky}>
         <div style={S.hTop}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1035,7 +1035,7 @@ export default function App() {
         </div>
 
         {/* Status */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span
             style={{
               width: "8px",
@@ -1049,7 +1049,10 @@ export default function App() {
           <span style={{ fontSize: "11px", color: online ? "rgba(16,185,129,0.8)" : "rgba(245,158,11,0.8)" }}>{online ? "Canlı Sync" : "Çevrimdışı (değişiklikler kaybolmaz)"}</span>
           <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.22)", marginLeft: "auto", letterSpacing: "1px" }}>{tourCode}</span>
         </div>
+      </div>
 
+      {/* HEADER - Scrollable Section */}
+      <div style={S.headerScrollable}>
         {/* ✅ YENİ - Liste filtresi */}
         {customLists.length > 1 && (
           <div style={{ display: "flex", gap: "6px", marginBottom: "12px", overflowX: "auto", paddingBottom: "4px" }}>
@@ -1389,12 +1392,19 @@ const S: any = {
   landingSub: { fontSize: "14px", color: "rgba(255,255,255,0.4)", marginBottom: "40px", lineHeight: 1.6, maxWidth: "260px" },
 
   headerSticky: {
-    position: "relative",
+    position: "sticky",
+    top: 0,
     zIndex: 999,
     background: "linear-gradient(135deg, rgba(30,50,90,0.98), rgba(20,35,70,0.98))",
     borderBottom: "1px solid rgba(59,130,246,0.15)",
-    padding: "20px 20px 20px",
+    padding: "20px 20px 10px",
     backdropFilter: "blur(8px)",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+  },
+  headerScrollable: {
+    background: "linear-gradient(135deg, rgba(30,50,90,0.98), rgba(20,35,70,0.98))",
+    padding: "10px 20px 20px",
+    borderBottom: "1px solid rgba(59,130,246,0.15)",
   },
   hTop: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" },
   hTitle: { fontSize: "18px", fontWeight: 800, letterSpacing: "-0.4px", color: "#fff" },
